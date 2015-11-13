@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"gopkg.in/alecthomas/kingpin.v2"
-	"bytes"
+	"io"
 )
 
 var (
@@ -15,14 +13,26 @@ var (
 	filename = kingpin.Arg("xml-file", "file").Required().String()
 )
 
+type StartElement struct {
+	buffer   []byte
+	position int
+}
+
 func main() {
 	kingpin.Version("0.0.1")
 	kingpin.Parse()
+
+	fmt.Println(*pathExp)
+
 	absFilename, err := abs(*filename)
 	if err != nil {
 		panic(err.Error())
 	}
 	SaxFile(absFilename)
+}
+
+func NewStartElement(bufferSize int) StartElement {
+	return StartElement{buffer: make([]byte, bufferSize), position: 0}
 }
 
 func SaxFile(filename string) {
@@ -31,62 +41,61 @@ func SaxFile(filename string) {
 		panic(err.Error())
 	}
 	defer file.Close()
-	reader := bufio.NewReader(file)
-	scanner := bufio.NewScanner(reader)
+	startElement := NewStartElement(1024 * 4)
+	SaxReader(file, 1024 * 4, startElement)
+}
 
-	var count int64 = 0
-	insideComment := false
-	scanner.Split(elementSplit)
-	for scanner.Scan() {
-		text := scanner.Text()
-		nospaceText := strings.TrimSpace(text)
-		if insideComment {
-			if strings.HasSuffix(nospaceText, "-->") {
-				fmt.Println("Comment End: " + nospaceText)
-				insideComment = false
+func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
+	buffer := make([]byte, bufferSize)
+	startElemFrom := -1
+	startElemTo := -1
+
+	var readCount int = 0
+	for {
+		n, err := reader.Read(buffer)
+
+		if n != 0 && err != nil {
+			panic("Error while reading xml")
+		}
+		if n == 0 {
+			break
+		}
+		for index, value := range buffer {
+			if value == byte('<') {
+				startElemFrom = index
 			}
-			continue
+			if value == byte('>') {
+				startElemTo = index
+			}
 		}
-		if nospaceText == "" {
-		}else if strings.HasPrefix(nospaceText, "!--") && strings.HasSuffix(nospaceText, "-->") {
-			// Begin commment  and end
-			fmt.Println("Comment Start and end: " + nospaceText)
-		}else if strings.HasPrefix(nospaceText, "!--") {
-			// Begin commment
-			insideComment = true
-			fmt.Println("Comment Start: " + nospaceText)
-		}else if strings.HasSuffix(nospaceText, "/>") {
-			//is start and endelem
-			fmt.Println("Start and end: " + nospaceText)
-		}else if strings.HasPrefix(nospaceText, "/") {
-			//is end elem
-			fmt.Println("End: " + nospaceText)
-		} else if strings.HasSuffix(nospaceText, ">") {
-			//is startElem
-			fmt.Println("Start: " + nospaceText)
-		}else {
-			//is startElem with content
-			fmt.Println("Start with content: " + nospaceText)
+		readCount = readCount + n
+		if startElemFrom != -1 && startElemTo == -1 &&startElement.position > 0 {
+			copy(startElement.buffer[startElement.position:], buffer[:n])
+			startElement.position = startElement.position + n
+		}
+		if startElemFrom != -1 && startElemTo == -1 &&startElement.position == 0 {
+			copy(startElement.buffer, buffer[startElemFrom:n])
+			startElement.position = startElement.position + n
+		}
+		if startElemFrom != -1 && startElemTo != -1 && startElement.position == 0{
+			startElem(buffer[startElemFrom:startElemTo])
+			startElemFrom = -1
+			startElemTo = -1
+		}
+		if startElemFrom != -1 && startElemTo != -1 && startElement.position > 0 {
+			copy(startElement.buffer[startElement.position:], buffer[:startElemTo])
+			startElemFrom = -1
+			startElemTo = -1
+			startElem(startElement.buffer)
+			startElement.position = 0
 		}
 	}
-	fmt.Printf("Read pages", count)
+	fmt.Println(readCount)
 }
 
-
-
-func elementSplit(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if atEOF && len(data) == 0 {
-		return 0, nil, nil
-	}
-	if i := bytes.IndexAny(data, "<"); i >= 0 {
-		return i + 1, data[0:i], nil
-	}
-	if atEOF {
-		return len(data), data, nil
-	}
-	return 0, nil, nil
+func startElem(bytes []byte) {
+	fmt.Println(string(bytes))
 }
-
 
 func abs(name string) (string, error) {
 	if path.IsAbs(name) {
