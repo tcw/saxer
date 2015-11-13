@@ -67,28 +67,29 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 			if value == byte('>') {
 				startElemTo = index
 			}
+			if startElemFrom != -1 && startElemTo != -1 && startElement.position == 0{
+				startElem(buffer[startElemFrom:startElemTo])
+				startElemFrom = -1
+				startElemTo = -1
+			}
+			if startElemFrom != -1 && startElemTo != -1 && startElement.position > 0 {
+				copy(startElement.buffer[startElement.position:], buffer[:startElemTo])
+				startElemFrom = -1
+				startElemTo = -1
+				startElem(startElement.buffer)
+				startElement.position = 0
+			}
 		}
 		readCount = readCount + n
-		if startElemFrom != -1 && startElemTo == -1 &&startElement.position > 0 {
+		if startElemFrom != -1 && startElemTo == -1 && startElement.position > 0 {
 			copy(startElement.buffer[startElement.position:], buffer[:n])
 			startElement.position = startElement.position + n
 		}
-		if startElemFrom != -1 && startElemTo == -1 &&startElement.position == 0 {
+		if startElemFrom != -1 && startElemTo == -1 && startElement.position == 0 {
 			copy(startElement.buffer, buffer[startElemFrom:n])
 			startElement.position = startElement.position + n
 		}
-		if startElemFrom != -1 && startElemTo != -1 && startElement.position == 0{
-			startElem(buffer[startElemFrom:startElemTo])
-			startElemFrom = -1
-			startElemTo = -1
-		}
-		if startElemFrom != -1 && startElemTo != -1 && startElement.position > 0 {
-			copy(startElement.buffer[startElement.position:], buffer[:startElemTo])
-			startElemFrom = -1
-			startElemTo = -1
-			startElem(startElement.buffer)
-			startElement.position = 0
-		}
+
 	}
 	fmt.Println(readCount)
 }
