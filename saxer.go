@@ -47,8 +47,7 @@ func SaxFile(filename string) {
 
 func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 	buffer := make([]byte, bufferSize)
-	startElemFrom := -1
-	startElemTo := -1
+
 
 	var readCount int = 0
 	for {
@@ -60,6 +59,8 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 		if n == 0 {
 			break
 		}
+		startElemFrom := -1
+		startElemTo := -1
 		for index, value := range buffer {
 			if value == byte('<') {
 				startElemFrom = index
@@ -68,15 +69,16 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 				startElemTo = index
 			}
 			if startElemFrom != -1 && startElemTo != -1 && startElement.position == 0{
+//				fmt.Print("inx",startElemFrom,startElemTo)
 				startElem(buffer[startElemFrom:startElemTo])
 				startElemFrom = -1
 				startElemTo = -1
 			}
-			if startElemFrom != -1 && startElemTo != -1 && startElement.position > 0 {
+			if startElemTo != -1 && startElement.position > 0 {
 				copy(startElement.buffer[startElement.position:], buffer[:startElemTo])
+				startElem(startElement.buffer)
 				startElemFrom = -1
 				startElemTo = -1
-				startElem(startElement.buffer)
 				startElement.position = 0
 			}
 		}
@@ -86,16 +88,20 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 			startElement.position = startElement.position + n
 		}
 		if startElemFrom != -1 && startElemTo == -1 && startElement.position == 0 {
+
+			if (n < startElemFrom){
+				fmt.Print("inx",startElemFrom,n,string(buffer))
+			}
 			copy(startElement.buffer, buffer[startElemFrom:n])
 			startElement.position = startElement.position + n
-		}
 
+		}
 	}
 	fmt.Println(readCount)
 }
 
 func startElem(bytes []byte) {
-	fmt.Println(string(bytes))
+	//fmt.Println(string(bytes))
 }
 
 func abs(name string) (string, error) {
