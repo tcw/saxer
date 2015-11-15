@@ -6,11 +6,14 @@ import (
 	"path"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"io"
+	"log"
+	"runtime/pprof"
 )
 
 var (
 	pathExp = kingpin.Arg("pathExp", "Sax Path Expression").Required().String()
 	filename = kingpin.Arg("xml-file", "file").Required().String()
+	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('c').Bool()
 )
 
 type StartElement struct {
@@ -23,6 +26,18 @@ func main() {
 	kingpin.Parse()
 
 	fmt.Println(*pathExp)
+
+	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
+	//evince callgraph.pdf
+	if *cpuProfile {
+		f, err := os.Create("cpu.pprof")
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		fmt.Println("profiling!")
+		defer pprof.StopCPUProfile()
+	}
 
 	absFilename, err := abs(*filename)
 	if err != nil {
@@ -47,10 +62,9 @@ func SaxFile(filename string) {
 
 func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 	buffer := make([]byte, bufferSize)
-
-
 	readCount := 0
 	inEscapeMode := false
+
 	for {
 		n, err := reader.Read(buffer)
 
@@ -65,12 +79,16 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 
 		for index, value := range buffer {
 			if inEscapeMode {
-				if value == byte('>'){
+				if value == byte('>') {
 					if index > 1 {
-						if buffer[index-1] == byte('-') && buffer[index-2] == byte('-'){
+						if buffer[index - 1] == byte('-') && buffer[index - 2] == byte('-') {
+							fmt.Print(index)
+							inEscapeMode = false
+						}else if buffer[index - 1] == byte(']') && buffer[index - 2] == byte(']') {
 							fmt.Print(index)
 							inEscapeMode = false
 						}
+						//TODO cache look behind 2 '--'
 					}
 				}
 				continue
@@ -81,25 +99,27 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 			if value == byte('>') {
 				elemStop = index
 			}
-			if value == byte('!'){
-				if elemStart == index -1{
-					fmt.Print("Ecsape mode")
-					inEscapeMode = true
-					continue
+			if value == byte('!') {
+				if index > 0 {
+					if buffer[index - 1] == byte('<') {
+						fmt.Print("Ecsape mode")
+						inEscapeMode = true
+						continue
+					}
 				}
-				if index == 0 && startElement.position > 0{
-					//TODO forrige buffer
+				if index == 0 && startElement.position > 0 {
+					//TODO cache look behind forrige buffer
 				}
 			}
 
-			if elemStop != -1 && elemStart == -1 && startElement.position > 0{
+			if elemStop != -1 && elemStart == -1 && startElement.position > 0 {
 				copy(startElement.buffer[startElement.position:], buffer[:elemStop])
 				startElement.position = 0
 				elemStart = -1
 				elemStop = -1
 			}
-			if elemStart != -1 && elemStop != -1{
-				startElem(buffer[elemStart:elemStop])
+			if elemStart != -1 && elemStop != -1 {
+				startOutput(buffer[elemStart:elemStop])
 				elemStart = -1
 				elemStop = -1
 			}
@@ -109,12 +129,14 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 			startElement.position = startElement.position + n
 		}
 
-		if elemStart != -1  {
+		if elemStart != -1 {
 			copy(startElement.buffer, buffer[:n])
 			startElement.position = startElement.position + n
 		}
-		if elemStop != -1  {
+		if elemStop != -1 {
 			copy(startElement.buffer[startElement.position:], buffer[:elemStop])
+			startElement.position = startElement.position + n
+			startOutput(startElement.buffer[:startElement.position])
 			startElement.position = 0
 		}
 
@@ -123,8 +145,8 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 	fmt.Println(readCount)
 }
 
-func startElem(bytes []byte) {
-	fmt.Println(string(bytes))
+func startOutput(bytes []byte) {
+	//	fmt.Println(string(bytes))
 }
 
 func abs(name string) (string, error) {

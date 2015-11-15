@@ -42,7 +42,7 @@
             </contributor>
             <minor/>
             <comment>[[bugzilla:42616]]</comment>
-            <text xml:space="preserve">#REDIRECT [[Lucifer (Marvel Comics)]]</text>
+            <text><![CDATA[Hello<! World!]]></text>
             <sha1>o9ijt4rc5od5ghvsh5pagenent0y58k</sha1>
             <model>wikitext</model>
             <format>text/x-wiki</format>
