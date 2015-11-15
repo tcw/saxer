@@ -33,6 +33,15 @@ func TestGetLastOnZeroPos(t *testing.T) {
 	assert.Equal(t,last,[]byte{'b','c'})
 }
 
+func TestHasLast(t *testing.T) {
+	hb := NewHistoryBuffer(5)
+	hb.Add(byte('a'))
+	hb.Add(byte('b'))
+	hb.Add(byte('c'))
+	last := hb.HasLast([]byte{'b','c'})
+	assert.True(t,last)
+}
+
 func BenchmarkAdd(b *testing.B) {
 	hb := NewHistoryBuffer(4096)
 	for i := 0; i < b.N; i++ {

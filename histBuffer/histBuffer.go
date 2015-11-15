@@ -7,7 +7,7 @@ type HistoryBuffer struct {
 	pos int
 }
 
-func NewHistoryBuffer(size int) HistoryBuffer{
+func NewHistoryBuffer(size int) HistoryBuffer {
 	i := make([]byte, size)
 	return HistoryBuffer{buf: i, pos:0}
 }
@@ -32,5 +32,15 @@ func (hb *HistoryBuffer)GetLast(n int) []byte {
 	}else {
 		return hb.buf[hb.pos - n:hb.pos]
 	}
+}
+
+func (hb *HistoryBuffer)HasLast(bytes []byte) bool {
+	byteFromBuffer := hb.GetLast(len(bytes))
+	for i := 0; i < len(bytes); i++ {
+		if bytes[i] != byteFromBuffer[i] {
+			return false
+		}
+	}
+	return true
 }
 
