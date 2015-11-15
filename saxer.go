@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"runtime/pprof"
+	"github.com/tcw/saxer/histBuffer"
 )
 
 var (
@@ -64,6 +65,7 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 	buffer := make([]byte, bufferSize)
 	readCount := 0
 	inEscapeMode := false
+	history := histBuffer.NewHistoryBuffer(1024 * 4)
 
 	for {
 		n, err := reader.Read(buffer)
@@ -78,17 +80,16 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 		elemStop := -1
 
 		for index, value := range buffer {
+			history.Add(value)
 			if inEscapeMode {
 				if value == byte('>') {
-					if index > 1 {
-						if buffer[index - 1] == byte('-') && buffer[index - 2] == byte('-') {
-							fmt.Print(index)
-							inEscapeMode = false
-						}else if buffer[index - 1] == byte(']') && buffer[index - 2] == byte(']') {
-							fmt.Print(index)
-							inEscapeMode = false
-						}
-						//TODO cache look behind 2 '--'
+					if history.HasLast([]byte{'-', '-'}) {
+						fmt.Print(index)
+						inEscapeMode = false
+					}
+					if history.HasLast([]byte{']', ']'}) {
+						fmt.Print(index)
+						inEscapeMode = false
 					}
 				}
 				continue
@@ -100,18 +101,11 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 				elemStop = index
 			}
 			if value == byte('!') {
-				if index > 0 {
-					if buffer[index - 1] == byte('<') {
-						fmt.Print("Ecsape mode")
-						inEscapeMode = true
-						continue
-					}
-				}
-				if index == 0 && startElement.position > 0 {
-					//TODO cache look behind forrige buffer
+				if history.HasLast([]byte{'<'}) {
+					fmt.Print(index)
+					inEscapeMode = true
 				}
 			}
-
 			if elemStop != -1 && elemStart == -1 && startElement.position > 0 {
 				copy(startElement.buffer[startElement.position:], buffer[:elemStop])
 				startElement.position = 0
@@ -119,7 +113,7 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 				elemStop = -1
 			}
 			if elemStart != -1 && elemStop != -1 {
-				startOutput(buffer[elemStart:elemStop])
+				ElementType(buffer[elemStart:elemStop])
 				elemStart = -1
 				elemStop = -1
 			}
@@ -128,7 +122,6 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 			copy(startElement.buffer[startElement.position:], buffer)
 			startElement.position = startElement.position + n
 		}
-
 		if elemStart != -1 {
 			copy(startElement.buffer, buffer[:n])
 			startElement.position = startElement.position + n
@@ -136,17 +129,25 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 		if elemStop != -1 {
 			copy(startElement.buffer[startElement.position:], buffer[:elemStop])
 			startElement.position = startElement.position + n
-			startOutput(startElement.buffer[:startElement.position])
+			ElementType(startElement.buffer[:startElement.position])
 			startElement.position = 0
 		}
-
 		readCount = readCount + n
 	}
 	fmt.Println(readCount)
 }
 
-func startOutput(bytes []byte) {
-	//	fmt.Println(string(bytes))
+func ElementType(bytes []byte) {
+	if bytes[1] == byte('/') {
+		//End node
+//		fmt.Println("End: ", string(bytes))
+	}else if bytes[len(bytes) - 1] == byte('/') {
+		//Start and end node
+//		fmt.Println("Start and end: ", string(bytes))
+	}else {
+		//Start node
+//		fmt.Println("Start: ", string(bytes))
+	}
 }
 
 func abs(name string) (string, error) {
