@@ -4,7 +4,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetLast(t *testing.T) {
+func TestGetLast2(t *testing.T) {
 	hb := NewHistoryBuffer(5)
 	hb.Add(byte('a'))
 	hb.Add(byte('b'))
@@ -13,6 +13,7 @@ func TestGetLast(t *testing.T) {
 	last := hb.GetLast(2)
 	assert.Equal(t,last,[]byte{'c','d'})
 }
+
 
 func TestGetLastSwich(t *testing.T) {
 	hb := NewHistoryBuffer(3)
@@ -34,6 +35,14 @@ func TestGetLastOnZeroPos(t *testing.T) {
 }
 
 func TestHasLast(t *testing.T) {
+	hb := NewHistoryBuffer(5)
+	hb.Add(byte('a'))
+	hb.Add(byte('b'))
+	last := hb.HasLast([]byte{'b'})
+	assert.True(t,last)
+}
+
+func TestHasLast2(t *testing.T) {
 	hb := NewHistoryBuffer(5)
 	hb.Add(byte('a'))
 	hb.Add(byte('b'))

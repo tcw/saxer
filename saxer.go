@@ -57,19 +57,18 @@ func SaxFile(filename string) {
 		panic(err.Error())
 	}
 	defer file.Close()
-	startElement := NewStartElement(1024 * 4)
-	SaxReader(file, 1024 * 4, startElement)
+
+	SaxReader(file, 1024 * 4, 1024 * 4)
 }
 
-func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
+func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
+	startElement := NewStartElement(tmpNodeBufferSize)
 	buffer := make([]byte, bufferSize)
 	readCount := 0
 	inEscapeMode := false
-	history := histBuffer.NewHistoryBuffer(1024 * 4)
-
+	history := histBuffer.NewHistoryBuffer(tmpNodeBufferSize)
 	for {
 		n, err := reader.Read(buffer)
-
 		if n != 0 && err != nil {
 			panic("Error while reading xml")
 		}
@@ -80,16 +79,18 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 		elemStop := -1
 
 		for index, value := range buffer {
-			history.Add(value)
 			if inEscapeMode {
+				history.Add(value)
 				if value == byte('>') {
-					if history.HasLast([]byte{'-', '-'}) {
-						fmt.Print(index)
+					if history.HasLast([]byte{'-', '-', '>'}) {
+						fmt.Print("commment",index)
 						inEscapeMode = false
+						continue
 					}
-					if history.HasLast([]byte{']', ']'}) {
-						fmt.Print(index)
+					if history.HasLast([]byte{']', ']', '>'}) {
+						fmt.Print("CDATA",index)
 						inEscapeMode = false
+						continue
 					}
 				}
 				continue
@@ -100,11 +101,11 @@ func SaxReader(reader io.Reader, bufferSize int, startElement StartElement) {
 			if value == byte('>') {
 				elemStop = index
 			}
-			if value == byte('!') {
-				if history.HasLast([]byte{'<'}) {
-					fmt.Print(index)
-					inEscapeMode = true
-				}
+			if (elemStart == index - 1 && value == byte('!')) || (index == 0 && startElement.position == 1 && value == byte('!')){
+				inEscapeMode = true
+				startElement.position = 0
+				elemStart = -1
+				continue
 			}
 			if elemStop != -1 && elemStart == -1 && startElement.position > 0 {
 				copy(startElement.buffer[startElement.position:], buffer[:elemStop])
