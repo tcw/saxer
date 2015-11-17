@@ -9,6 +9,7 @@ import (
 	"log"
 	"runtime/pprof"
 	"github.com/tcw/saxer/histBuffer"
+	"github.com/tcw/saxer/nodeBuffer"
 )
 
 var (
@@ -67,6 +68,8 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 	readCount := 0
 	inEscapeMode := false
 	history := histBuffer.NewHistoryBuffer(tmpNodeBufferSize)
+	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024)
+	isRecoding := false
 	for {
 		n, err := reader.Read(buffer)
 		if n != 0 && err != nil {
@@ -83,25 +86,27 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 				history.Add(value)
 				if value == byte('>') {
 					if history.HasLast([]byte{'-', '-', '>'}) {
-						fmt.Print("commment",index)
 						inEscapeMode = false
 						continue
 					}
 					if history.HasLast([]byte{']', ']', '>'}) {
-						fmt.Print("CDATA",index)
 						inEscapeMode = false
 						continue
 					}
 				}
 				continue
 			}
+			if isRecoding {
+				nodeBuffer.Add(value)
+			}
+
 			if value == byte('<') {
 				elemStart = index
 			}
 			if value == byte('>') {
 				elemStop = index
 			}
-			if (elemStart == index - 1 && value == byte('!')) || (index == 0 && startElement.position == 1 && value == byte('!')){
+			if (elemStart == index - 1 && value == byte('!')) || (index == 0 && startElement.position == 1 && value == byte('!')) {
 				inEscapeMode = true
 				startElement.position = 0
 				elemStart = -1
@@ -114,7 +119,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 				elemStop = -1
 			}
 			if elemStart != -1 && elemStop != -1 {
-				ElementType(buffer[elemStart:elemStop])
+				isRecoding = ElementType(buffer[elemStart:elemStop], &nodeBuffer,isRecoding)
 				elemStart = -1
 				elemStop = -1
 			}
@@ -130,7 +135,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 		if elemStop != -1 {
 			copy(startElement.buffer[startElement.position:], buffer[:elemStop])
 			startElement.position = startElement.position + n
-			ElementType(startElement.buffer[:startElement.position])
+			isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer,isRecoding)
 			startElement.position = 0
 		}
 		readCount = readCount + n
@@ -138,16 +143,21 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 	fmt.Println(readCount)
 }
 
-func ElementType(bytes []byte) {
+func ElementType(bytes []byte, nodeBuffer *nodeBuffer.NodeBuffer,isRecoding bool) bool {
 	if bytes[1] == byte('/') {
-		//End node
-//		fmt.Println("End: ", string(bytes))
+		nodeBuffer.Emit()
+		nodeBuffer.Reset()
+		return false
 	}else if bytes[len(bytes) - 1] == byte('/') {
-		//Start and end node
-//		fmt.Println("Start and end: ", string(bytes))
+		nodeBuffer.AddArray(bytes)
+		nodeBuffer.Add(byte('>'))
+		return false
 	}else {
-		//Start node
-//		fmt.Println("Start: ", string(bytes))
+		if !isRecoding{
+			nodeBuffer.AddArray(bytes)
+			nodeBuffer.Add(byte('>'))
+		}
+		return true
 	}
 }
 
