@@ -10,6 +10,8 @@ import (
 	"runtime/pprof"
 	"github.com/tcw/saxer/histBuffer"
 	"github.com/tcw/saxer/nodeBuffer"
+	"bytes"
+	"github.com/tcw/saxer/nodePath"
 )
 
 var (
@@ -59,16 +61,17 @@ func SaxFile(filename string) {
 	}
 	defer file.Close()
 
-	SaxReader(file, 1024 * 4, 1024 * 4)
+	SaxReader(file, 1024 * 4, 1024 * 4,*pathExp)
 }
 
-func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
+func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int,pathQuery string) {
 	startElement := NewStartElement(tmpNodeBufferSize)
 	buffer := make([]byte, bufferSize)
 	readCount := 0
 	inEscapeMode := false
 	history := histBuffer.NewHistoryBuffer(tmpNodeBufferSize)
 	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024)
+	nodePath := nodePath.NewNodePath(100, pathQuery)
 	isRecoding := false
 	for {
 		n, err := reader.Read(buffer)
@@ -99,7 +102,6 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 			if isRecoding {
 				nodeBuffer.Add(value)
 			}
-
 			if value == byte('<') {
 				elemStart = index
 			}
@@ -119,7 +121,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 				elemStop = -1
 			}
 			if elemStart != -1 && elemStop != -1 {
-				isRecoding = ElementType(buffer[elemStart:elemStop], &nodeBuffer,isRecoding)
+				isRecoding = ElementType(buffer[elemStart:elemStop], &nodeBuffer,&nodePath,isRecoding)
 				elemStart = -1
 				elemStop = -1
 			}
@@ -135,7 +137,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 		if elemStop != -1 {
 			copy(startElement.buffer[startElement.position:], buffer[:elemStop])
 			startElement.position = startElement.position + n
-			isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer,isRecoding)
+			isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer,&nodePath,isRecoding)
 			startElement.position = 0
 		}
 		readCount = readCount + n
@@ -143,22 +145,44 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int) {
 	fmt.Println(readCount)
 }
 
-func ElementType(bytes []byte, nodeBuffer *nodeBuffer.NodeBuffer,isRecoding bool) bool {
-	if bytes[1] == byte('/') {
+func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer,nodePath *nodePath.NodePath,isRecoding bool) bool {
+	if nodeContent[1] == byte('/') {
 		nodeBuffer.Emit()
 		nodeBuffer.Reset()
+		nodePath.RemoveLast()
 		return false
-	}else if bytes[len(bytes) - 1] == byte('/') {
-		nodeBuffer.AddArray(bytes)
-		nodeBuffer.Add(byte('>'))
+	}else if nodeContent[len(nodeContent) - 1] == byte('/') {
+		nodePath.Add(getNodeName(nodeContent))
+		if nodePath.MatchesPath(){
+			nodeBuffer.AddArray(nodeContent)
+			nodeBuffer.Add(byte('>'))
+			nodeBuffer.Emit()
+			nodeBuffer.Reset()
+		}
+		nodePath.RemoveLast()
 		return false
 	}else {
 		if !isRecoding{
-			nodeBuffer.AddArray(bytes)
-			nodeBuffer.Add(byte('>'))
+			nodePath.Add(getNodeName(nodeContent))
+			if nodePath.MatchesPath(){
+				nodeBuffer.AddArray(nodeContent)
+				nodeBuffer.Add(byte('>'))
+			}else {
+				return false
+			}
 		}
 		return true
 	}
+}
+
+func getNodeName(nodeContent []byte)string{
+	idx := bytes.IndexByte(nodeContent,byte(' '))
+	if idx == -1 {
+		return string(nodeContent[1:])
+	}else{
+		return string(nodeContent[1:idx])
+	}
+
 }
 
 func abs(name string) (string, error) {

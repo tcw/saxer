@@ -17,19 +17,16 @@ func (nb *NodeBuffer)Reset() {
 
 func (nb *NodeBuffer)Add(b byte) {
 	nb.buf[nb.pos] = b
-	if nb.pos == len(nb.buf) - 1 {
-		nb.pos = 0
-	}else {
-		nb.pos++
-	}
+	nb.pos++
+
 }
 
 func (nb *NodeBuffer)AddArray(b []byte) {
-	copy(nb.buf[nb.pos:],b)
+	copy(nb.buf[nb.pos:], b)
 	nb.pos = nb.pos + len(b)
 }
 
-func (nb *NodeBuffer) Emit(){
+func (nb *NodeBuffer) Emit() {
 	fmt.Println(string(nb.buf[:nb.pos]))
 	fmt.Println()
 }
