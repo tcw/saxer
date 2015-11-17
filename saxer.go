@@ -29,8 +29,6 @@ func main() {
 	kingpin.Version("0.0.1")
 	kingpin.Parse()
 
-	fmt.Println(*pathExp)
-
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
 	//evince callgraph.pdf
 	if *cpuProfile {
@@ -61,13 +59,12 @@ func SaxFile(filename string) {
 	}
 	defer file.Close()
 
-	SaxReader(file, 1024 * 4, 1024 * 4,*pathExp)
+	SaxReader(file, 1024 * 4, 1024 * 4, *pathExp)
 }
 
-func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int,pathQuery string) {
+func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string) {
 	startElement := NewStartElement(tmpNodeBufferSize)
 	buffer := make([]byte, bufferSize)
-	readCount := 0
 	inEscapeMode := false
 	history := histBuffer.NewHistoryBuffer(tmpNodeBufferSize)
 	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024)
@@ -121,7 +118,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int,pathQuery
 				elemStop = -1
 			}
 			if elemStart != -1 && elemStop != -1 {
-				isRecoding = ElementType(buffer[elemStart:elemStop], &nodeBuffer,&nodePath,isRecoding)
+				isRecoding = ElementType(buffer[elemStart:elemStop], &nodeBuffer, &nodePath, isRecoding)
 				elemStart = -1
 				elemStop = -1
 			}
@@ -137,34 +134,36 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int,pathQuery
 		if elemStop != -1 {
 			copy(startElement.buffer[startElement.position:], buffer[:elemStop])
 			startElement.position = startElement.position + n
-			isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer,&nodePath,isRecoding)
+			isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer, &nodePath, isRecoding)
 			startElement.position = 0
 		}
-		readCount = readCount + n
 	}
-	fmt.Println(readCount)
 }
 
-func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer,nodePath *nodePath.NodePath,isRecoding bool) bool {
+func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath *nodePath.NodePath, isRecoding bool) bool {
 	if nodeContent[1] == byte('/') {
-		nodeBuffer.Emit()
-		nodeBuffer.Reset()
-		nodePath.RemoveLast()
-		return false
-	}else if nodeContent[len(nodeContent) - 1] == byte('/') {
-		nodePath.Add(getNodeName(nodeContent))
-		if nodePath.MatchesPath(){
-			nodeBuffer.AddArray(nodeContent)
-			nodeBuffer.Add(byte('>'))
+		if isRecoding {
 			nodeBuffer.Emit()
 			nodeBuffer.Reset()
 		}
 		nodePath.RemoveLast()
 		return false
+	}else if nodeContent[len(nodeContent) - 1] == byte('/') {
+		nodePath.Add(getNodeName(nodeContent))
+		if nodePath.MatchesPath() {
+			if isRecoding {
+				nodeBuffer.AddArray(nodeContent)
+				nodeBuffer.Add(byte('>'))
+				nodeBuffer.Emit()
+				nodeBuffer.Reset()
+			}
+		}
+		nodePath.RemoveLast()
+		return false
 	}else {
-		if !isRecoding{
+		if !isRecoding {
 			nodePath.Add(getNodeName(nodeContent))
-			if nodePath.MatchesPath(){
+			if nodePath.MatchesPath() {
 				nodeBuffer.AddArray(nodeContent)
 				nodeBuffer.Add(byte('>'))
 			}else {
@@ -175,14 +174,13 @@ func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer,nodePath 
 	}
 }
 
-func getNodeName(nodeContent []byte)string{
-	idx := bytes.IndexByte(nodeContent,byte(' '))
+func getNodeName(nodeContent []byte) string {
+	idx := bytes.IndexByte(nodeContent, byte(' '))
 	if idx == -1 {
 		return string(nodeContent[1:])
-	}else{
+	}else {
 		return string(nodeContent[1:idx])
 	}
-
 }
 
 func abs(name string) (string, error) {
