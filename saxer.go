@@ -143,8 +143,13 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath *nodePath.NodePath, isRecoding bool) bool {
 	if nodeContent[1] == byte('/') {
 		if isRecoding {
-			nodeBuffer.Emit()
-			nodeBuffer.Reset()
+			if nodePath.MatchesPath() {
+				nodeBuffer.Emit()
+				nodeBuffer.Reset()
+			}else{
+				nodePath.RemoveLast()
+				return true
+			}
 		}
 		nodePath.RemoveLast()
 		return false
@@ -161,11 +166,12 @@ func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath
 		nodePath.RemoveLast()
 		return false
 	}else {
+		nodePath.Add(getNodeName(nodeContent))
 		if !isRecoding {
-			nodePath.Add(getNodeName(nodeContent))
 			if nodePath.MatchesPath() {
 				nodeBuffer.AddArray(nodeContent)
 				nodeBuffer.Add(byte('>'))
+				return true
 			}else {
 				return false
 			}
