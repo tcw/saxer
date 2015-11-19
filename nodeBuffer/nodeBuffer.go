@@ -18,7 +18,6 @@ func (nb *NodeBuffer)Reset() {
 func (nb *NodeBuffer)Add(b byte) {
 	nb.buf[nb.pos] = b
 	nb.pos++
-
 }
 
 func (nb *NodeBuffer)AddArray(b []byte) {
@@ -28,7 +27,6 @@ func (nb *NodeBuffer)AddArray(b []byte) {
 
 func (nb *NodeBuffer) Emit() {
 	fmt.Println(string(nb.buf[:nb.pos]))
-	fmt.Println()
 }
 
 

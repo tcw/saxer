@@ -1,9 +1,11 @@
 <mediawiki>
-    <page />
+    <page/>
     <!-- testing -->
     <!-- testing <page>
-    /page</page>--><page>
-        /page</page>
+    /page</page>-->
+    <page>
+        /page
+    </page>
     <page>
         <title>Category:2000 in sports</title>
         <ns>14</ns>
@@ -23,6 +25,73 @@
 
 [[Category:20th century in sports]]</text>
             <sha1>9251buu0m4akfm829ibq603dmyto4o0</sha1>
+            <model>wikitext</model>
+            <format>text/x-wiki</format>
+        </revision>
+    </page>
+    <page>
+        <title>Yuji Hamano</title>
+        <ns>0</ns>
+        <id>925108</id>
+        <revision>
+            <id>612525220</id>
+            <parentid>543504847</parentid>
+            <timestamp>2014-06-11T17:34:36Z</timestamp>
+            <contributor>
+                <username>Mohsen1248</username>
+                <id>3761856</id>
+            </contributor>
+            <comment>added [[Category:Archers at the 2002 Asian Games]] using [[WP:HC|HotCat]]</comment>
+            <text xml:space="preserve">{{nihongo|'''Yuji Hamano'''|濱野 裕二|Hamano Yūji|extra=born September 6, 1980 in [[Hiroshima Prefecture|Hiroshima]]}} is an athlete from [[Japan]], who competes in [[archery]].
+
+At the [[Archery at the 2004 Summer Olympics|2004 Summer Olympics]] he was again defeated in the first round of elimination, placing 37th overall in men's individual archery. Later he was a member of the 8th-place Japanese men's archery team.
+
+He placed 42nd at the [[Archery at the 2000 Summer Olympics|2000 Summer Olympics]].
+
+==External links==
+*[http://www.olympianbiographies.com/ath4080.html Olympic athlete biographies - Yuji HAMANO, Archery JPN]
+*[http://www.joc.or.jp/athens/athlete/archery/hamanoyuji.html 2004Japan Olympic Committee]
+
+{{Persondata &lt;!-- Metadata: see [[Wikipedia:Persondata]]. --&gt;
+| NAME              = Hamano, Yuji
+| ALTERNATIVE NAMES =
+| SHORT DESCRIPTION = Japanese archer
+| DATE OF BIRTH     = 1980
+| PLACE OF BIRTH    =
+| DATE OF DEATH     =
+| PLACE OF DEATH    =
+}}
+{{DEFAULTSORT:Hamano, Yuji}}
+[[Category:1980 births]]
+[[Category:Living people]]
+[[Category:Japanese archers]]
+[[Category:Olympic archers of Japan]]
+[[Category:Archers at the 2000 Summer Olympics]]
+[[Category:Archers at the 2004 Summer Olympics]]
+[[Category:Asian Games medalists in archery]]
+[[Category:Archers at the 2002 Asian Games]]
+
+
+{{Japan-archery-bio-stub}}</text>
+            <sha1>5cs3wn4jnx8hqm5rva1iz4rx0abipju</sha1>
+            <model>wikitext</model>
+            <format>text/x-wiki</format>
+        </revision>
+    </page>
+    <page>
+        <title>St. Paul Union Depot</title>
+        <ns>0</ns>
+        <id>925112</id>
+        <redirect title="Saint Paul Union Depot"/>
+        <revision>
+            <id>16716798</id>
+            <timestamp>2004-08-24T05:16:17Z</timestamp>
+            <contributor>
+                <username>Mulad</username>
+                <id>12070</id>
+            </contributor>
+            <text xml:space="preserve">#REDIRECT [[Saint Paul Union Depot]]</text>
+            <sha1>odc3kxb2poc3c3lu62221gwqoiniw6d</sha1>
             <model>wikitext</model>
             <format>text/x-wiki</format>
         </revision>

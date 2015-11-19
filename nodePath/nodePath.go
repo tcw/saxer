@@ -1,5 +1,7 @@
 package nodePath
-import "strings"
+import (
+	"strings"
+)
 
 type NodePath struct {
 	pathQuery []string
@@ -12,6 +14,11 @@ func NewNodePath(size int, query string) NodePath {
 	split := strings.Split(query, "/")
 	return NodePath{pathQuery:split, path: i, pos:0}
 }
+
+func (np *NodePath)GetPath() string{
+	return strings.Join(np.path[:np.pos],"/")
+}
+
 
 func (np *NodePath)Add(s string) {
 	np.path[np.pos] = s
