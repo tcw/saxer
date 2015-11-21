@@ -29,6 +29,6 @@ func TestParseWithEscapeAndCDATA(t *testing.T) {
 }
 
 func TestTmp(t *testing.T) {
-	newline := "\n"
+	newline := "&lt;"
 	fmt.Printf("%X",newline)
 }

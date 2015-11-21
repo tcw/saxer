@@ -1,4 +1,11 @@
 <mediawiki>
+    <page/>
+    <!-- testing -->
+    <!-- testing <page>
+    /page</page>-->
+    <page>
+        /page
+    </page>
     <page>
         <title>Category:2000 in sports</title>
         <ns>14</ns>

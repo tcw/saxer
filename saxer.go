@@ -59,7 +59,7 @@ func SaxFile(filename string) {
 	}
 	defer file.Close()
 
-	SaxReader(file, 5, 1024*4, *pathExp)
+	SaxReader(file, 1024*4, 1024*4, *pathExp)
 }
 
 func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string) {
@@ -70,7 +70,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024)
 	nodePath := nodePath.NewNodePath(100, pathQuery)
 	isRecoding := false
-	var lineNumber uint64 = 1
+	var lineNumber uint64 = 0
 	for {
 		n, err := reader.Read(buffer)
 		if n != 0 && err != nil {
@@ -109,8 +109,8 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 			if value == byte('>') {
 				elemStop = index
 			}
-			if (elemStart == index - 1 && value == byte('!')) || (index == 0 && startElement.position == 1 && value == byte('!')) {
-				fmt.Println("ENTERED ECSAPE MODE",lineNumber)
+			if ((elemStart != -1 && index != 0 && elemStart == index - 1) && value == byte('!')) || (index == 0 && startElement.position == 1 && value == byte('!')) {
+				fmt.Println("ENTERED ECSAPE MODE")
 				inEscapeMode = true
 				startElement.position = 0
 				elemStart = -1
