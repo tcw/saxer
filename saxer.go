@@ -58,16 +58,21 @@ func SaxFile(filename string) {
 		panic(err.Error())
 	}
 	defer file.Close()
-
-	SaxReader(file, 1024*4, 1024*4, *pathExp)
+	emitter := make(chan string)
+	go emitterHandler(emitter)
+	SaxReader(file, 1024*4, 1024*4, *pathExp,emitter)
 }
 
-func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string) {
+func emitterHandler(emitter chan string)  {
+	fmt.Println(<-emitter)
+}
+
+func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string,emitter chan string) {
 	startElement := NewStartElement(tmpNodeBufferSize)
 	buffer := make([]byte, bufferSize)
 	inEscapeMode := false
 	history := histBuffer.NewHistoryBuffer(tmpNodeBufferSize)
-	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024)
+	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024,emitter)
 	nodePath := nodePath.NewNodePath(1000, pathQuery)
 	isRecoding := false
 	var lineNumber uint64 = 0
@@ -110,13 +115,12 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 				elemStop = index
 			}
 			if ((elemStart != -1 && index != 0 && elemStart == index - 1) && value == byte('!')) || (index == 0 && startElement.position == 1 && value == byte('!')) {
-				fmt.Println("ENTERED ECSAPE MODE")
 				inEscapeMode = true
 				startElement.position = 0
 				elemStart = -1
 			}else if elemStart != -1 && elemStop != -1 && startElement.position == 0 {
 				if elemStart > elemStop {
-					panic(fmt.Sprintf("%d > than %d with buffer %q", elemStart, elemStop, buffer))
+					panic(fmt.Sprintf("Parsing error at line %d, possible syntax error", lineNumber))
 				}
 				isRecoding = ElementType(buffer[elemStart:elemStop], &nodeBuffer, &nodePath, isRecoding)
 				elemStart = -1
