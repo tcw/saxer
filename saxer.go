@@ -10,8 +10,8 @@ import (
 	"runtime/pprof"
 	"github.com/tcw/saxer/histBuffer"
 	"github.com/tcw/saxer/nodeBuffer"
-	"bytes"
 	"github.com/tcw/saxer/nodePath"
+	"bytes"
 )
 
 var (
@@ -59,7 +59,7 @@ func SaxFile(filename string) {
 	}
 	defer file.Close()
 
-	SaxReader(file, 1024 * 4, 1024 * 4, *pathExp)
+	SaxReader(file, 5, 100, *pathExp)
 }
 
 func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string) {
@@ -80,7 +80,6 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 		}
 		elemStart := -1
 		elemStop := -1
-		fmt.Printf("buffer: %q\n", buffer)
 		for index := 0; index < n; index++ {
 			value := buffer[index]
 			if inEscapeMode {
@@ -112,41 +111,45 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 				elemStart = -1
 				continue
 			}
-			if elemStart != -1 && elemStop != -1 {
+			if elemStart != -1 && elemStop != -1 && startElement.position == 0 {
 				if elemStart > elemStop {
 					panic(fmt.Sprintf("%d > than %d with buffer %q", elemStart, elemStop, buffer))
 				}
 				isRecoding = ElementType(buffer[elemStart:elemStop], &nodeBuffer, &nodePath, isRecoding)
 				elemStart = -1
 				elemStop = -1
+			}else if elemStop != -1 {
+				copy(startElement.buffer[startElement.position:], buffer[:elemStop])
+				startElement.position = startElement.position + elemStop
+				isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer, &nodePath, isRecoding)
+				startElement.position = 0
+				elemStop = -1
 			}
 		}
 		if elemStart == -1 && elemStop == -1 && startElement.position > 0 {
 			copy(startElement.buffer[startElement.position:], buffer)
 			startElement.position = startElement.position + n
-		}
-		if elemStart != -1 {
+		}else if elemStart != -1 {
 			copy(startElement.buffer, buffer[elemStart:n])
 			startElement.position = startElement.position + (n - elemStart)
-		}
-		if elemStop != -1 {
+		}else if elemStop != -1 {
 			copy(startElement.buffer[startElement.position:], buffer[:elemStop])
-			startElement.position = startElement.position + n
+			startElement.position = startElement.position + elemStop
 			isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer, &nodePath, isRecoding)
+			nodeBuffer.AddArray(buffer[elemStop + 1:])
 			startElement.position = 0
 		}
-		fmt.Printf("startElement: pos %d, %q\n", startElement.position, startElement.buffer)
-
 	}
 }
 
 func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath *nodePath.NodePath, isRecoding bool) bool {
 	if nodeContent[1] == byte('/') {
-		fmt.Printf("End NodeContent %q\n", nodeContent)
 		if isRecoding {
 			if nodePath.MatchesPath() {
 				nodeBuffer.Emit()
 				nodeBuffer.Reset()
+				nodePath.RemoveLast()
+				return false
 			}else {
 				nodePath.RemoveLast()
 				return true
@@ -167,7 +170,6 @@ func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath
 		nodePath.RemoveLast()
 		return false
 	}else {
-		fmt.Printf("Start NodeContent %q\n", nodeContent)
 		nodename := getNodeName(nodeContent)
 		nodePath.Add(nodename)
 		if !isRecoding {
@@ -178,8 +180,9 @@ func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath
 			}else {
 				return false
 			}
+		}else{
+			return true
 		}
-		return true
 	}
 }
 

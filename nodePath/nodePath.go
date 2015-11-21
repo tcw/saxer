@@ -19,7 +19,6 @@ func (np *NodePath)GetPath() string{
 	return strings.Join(np.path[:np.pos],"/")
 }
 
-
 func (np *NodePath)Add(s string) {
 	np.path[np.pos] = s
 	np.pos++
