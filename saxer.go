@@ -64,7 +64,9 @@ func SaxFile(filename string) {
 }
 
 func emitterHandler(emitter chan string)  {
-	fmt.Println(<-emitter)
+	for{
+		fmt.Println(<-emitter)
+	}
 }
 
 func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string,emitter chan string) {
