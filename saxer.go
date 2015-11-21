@@ -68,7 +68,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 	inEscapeMode := false
 	history := histBuffer.NewHistoryBuffer(tmpNodeBufferSize)
 	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024)
-	nodePath := nodePath.NewNodePath(100, pathQuery)
+	nodePath := nodePath.NewNodePath(1000, pathQuery)
 	isRecoding := false
 	var lineNumber uint64 = 0
 	for {
@@ -83,6 +83,9 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 		elemStop := -1
 		for index := 0; index < n; index++ {
 			value := buffer[index]
+			if isRecoding {
+				nodeBuffer.Add(value)
+			}
 			if inEscapeMode {
 				history.Add(value)
 				if value == byte('>') {
@@ -96,9 +99,6 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 					}
 				}
 				continue
-			}
-			if isRecoding {
-				nodeBuffer.Add(value)
 			}
 			if value == 0x0A {
 				lineNumber++
@@ -114,9 +114,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 				inEscapeMode = true
 				startElement.position = 0
 				elemStart = -1
-				continue
-			}
-			if elemStart != -1 && elemStop != -1 && startElement.position == 0 {
+			}else if elemStart != -1 && elemStop != -1 && startElement.position == 0 {
 				if elemStart > elemStop {
 					panic(fmt.Sprintf("%d > than %d with buffer %q", elemStart, elemStop, buffer))
 				}
@@ -145,7 +143,6 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 			startElement.position = 0
 		}
 	}
-	fmt.Println("Read lines:", lineNumber)
 }
 
 func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath *nodePath.NodePath, isRecoding bool) bool {
