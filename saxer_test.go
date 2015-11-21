@@ -6,6 +6,7 @@ import (
 //	"os"
 	"github.com/zacg/testify/assert"
 //"os"
+	"os"
 )
 
 
@@ -79,7 +80,10 @@ func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 	close(emitterChannel)
 }
 
-//func TestParseWithEscapeAndCDATA(t *testing.T) {
-//	reader,_ := os.Open("test.xml")
-//	SaxReader(reader,1024,1024,"mediawiki")
-//}
+func TestParseWithEscapeAndCDATA(t *testing.T) {
+	reader,_ := os.Open("test.xml")
+	emitterChannel := make(chan string)
+	go emitterEquals(t, emitterChannel,"<id>14954744</id>","<id>3761856</id>", "<id>12070</id>","<id>212624</id>","<id>6569922</id>",)
+	SaxReader(reader, 1, 1024, "mediawiki/page/revision/contributor/id", emitterChannel)
+	close(emitterChannel)
+}

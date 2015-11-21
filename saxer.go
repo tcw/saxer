@@ -116,7 +116,8 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 			if value == byte('>') {
 				elemStop = index
 			}
-			if ((elemStart != -1 && index != 0 && elemStart == index - 1) && value == byte('!')) || (index == 0 && startElement.position == 1 && value == byte('!')) {
+			if ((elemStart != -1 && index != 0 && elemStart == index - 1) && value == byte('!')) ||
+			(index == 0 && startElement.position == 1 && value == byte('!')) {
 				inEscapeMode = true
 				startElement.position = 0
 				elemStart = -1
@@ -141,12 +142,6 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 		}else if elemStart != -1 {
 			copy(startElement.buffer, buffer[elemStart:n])
 			startElement.position = startElement.position + (n - elemStart)
-		}else if elemStop != -1 {
-			copy(startElement.buffer[startElement.position:], buffer[:elemStop])
-			startElement.position = startElement.position + elemStop
-			isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer, &nodePath, isRecoding)
-			nodeBuffer.AddArray(buffer[elemStop + 1:])
-			startElement.position = 0
 		}
 	}
 }
