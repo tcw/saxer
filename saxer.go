@@ -58,23 +58,23 @@ func SaxFile(filename string) {
 		panic(err.Error())
 	}
 	defer file.Close()
-	emitter := make(chan string,1000)
+	emitter := make(chan string, 1000)
 	go emitterHandler(emitter)
-	SaxReader(file, 1024*4, 1024*4, *pathExp,emitter)
+	SaxReader(file, 1024 * 4, 1024 * 4, *pathExp, emitter)
 }
 
-func emitterHandler(emitter chan string)  {
-	for{
+func emitterHandler(emitter chan string) {
+	for {
 		fmt.Println(<-emitter)
 	}
 }
 
-func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string,emitter chan string) {
+func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string, emitter chan string) {
 	startElement := NewStartElement(tmpNodeBufferSize)
 	buffer := make([]byte, bufferSize)
 	inEscapeMode := false
 	history := histBuffer.NewHistoryBuffer(tmpNodeBufferSize)
-	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024,emitter)
+	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024, emitter)
 	nodePath := nodePath.NewNodePath(1000, pathQuery)
 	isRecoding := false
 	var lineNumber uint64 = 0
@@ -149,7 +149,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath *nodePath.NodePath, isRecoding bool) bool {
 	if nodeContent[1] == byte('/') {
 		if isRecoding {
-			if nodePath.MatchesPath() {
+			if nodePath.MatchesLastMatch() {
 				nodeBuffer.Emit()
 				nodeBuffer.Reset()
 				nodePath.RemoveLast()
@@ -184,7 +184,7 @@ func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath
 			}else {
 				return false
 			}
-		}else{
+		}else {
 			return true
 		}
 	}
