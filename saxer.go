@@ -59,7 +59,7 @@ func SaxFile(filename string) {
 	}
 	defer file.Close()
 
-	SaxReader(file, 5, 100, *pathExp)
+	SaxReader(file, 5, 1024*4, *pathExp)
 }
 
 func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string) {
@@ -70,6 +70,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024)
 	nodePath := nodePath.NewNodePath(100, pathQuery)
 	isRecoding := false
+	var lineNumber uint64 = 1
 	for {
 		n, err := reader.Read(buffer)
 		if n != 0 && err != nil {
@@ -99,6 +100,9 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 			if isRecoding {
 				nodeBuffer.Add(value)
 			}
+			if value == 0x0A {
+				lineNumber++
+			}
 			if value == byte('<') {
 				elemStart = index
 			}
@@ -106,6 +110,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 				elemStop = index
 			}
 			if (elemStart == index - 1 && value == byte('!')) || (index == 0 && startElement.position == 1 && value == byte('!')) {
+				fmt.Println("ENTERED ECSAPE MODE",lineNumber)
 				inEscapeMode = true
 				startElement.position = 0
 				elemStart = -1
@@ -140,6 +145,7 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 			startElement.position = 0
 		}
 	}
+	fmt.Println("Read lines:", lineNumber)
 }
 
 func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath *nodePath.NodePath, isRecoding bool) bool {

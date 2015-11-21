@@ -5,6 +5,7 @@ import (
 //	"github.com/zacg/testify/assert"
 	"bytes"
 	"os"
+	"fmt"
 )
 
 func TestParseXml(t *testing.T) {
@@ -25,4 +26,9 @@ func TestParseXmlOverFullNoder(t *testing.T) {
 func TestParseWithEscapeAndCDATA(t *testing.T) {
 	reader,_ := os.Open("test.xml")
 	SaxReader(reader,1024,1024,"mediawiki")
+}
+
+func TestTmp(t *testing.T) {
+	newline := "\n"
+	fmt.Printf("%X",newline)
 }
