@@ -58,7 +58,7 @@ func SaxFile(filename string) {
 		panic(err.Error())
 	}
 	defer file.Close()
-	emitter := make(chan string)
+	emitter := make(chan string,1000)
 	go emitterHandler(emitter)
 	SaxReader(file, 1024*4, 1024*4, *pathExp,emitter)
 }
