@@ -1,4 +1,5 @@
-package nodeBuffer
+package contentBuffer
+
 import (
 	"testing"
 	"github.com/stretchr/testify/assert"
@@ -6,34 +7,34 @@ import (
 
 func TestAdd(t *testing.T) {
 	emitterOut := make(chan string)
-	nb := NewNodeBuffer(1024, emitterOut)
-	nb.Add(byte('a'))
-	nb.Add(byte('b'))
-	nb.Add(byte('c'))
+	cb := NewContentBuffer(1024, emitterOut)
+	cb.Add(byte('a'))
+	cb.Add(byte('b'))
+	cb.Add(byte('c'))
 	go emitterEquals(t, emitterOut, "abc")
-	nb.Emit()
+	cb.Emit()
 }
 
 func TestReset(t *testing.T) {
 	emitterOut := make(chan string)
-	nb := NewNodeBuffer(1024, emitterOut)
-	nb.Add(byte('a'))
-	nb.Add(byte('b'))
-	nb.Add(byte('c'))
+	cb := NewContentBuffer(1024, emitterOut)
+	cb.Add(byte('a'))
+	cb.Add(byte('b'))
+	cb.Add(byte('c'))
 	go emitterEquals(t, emitterOut, "abc")
-	nb.Emit()
-	nb.Reset()
-	nb.Add(byte('d'))
+	cb.Emit()
+	cb.Reset()
+	cb.Add(byte('d'))
 	go emitterEquals(t, emitterOut, "d")
-	nb.Emit();
+	cb.Emit();
 }
 
 func TestAddArray(t *testing.T) {
 	emitterOut := make(chan string)
-	nb := NewNodeBuffer(1024, emitterOut)
-	nb.AddArray([]byte{'a', 'b', 'c'})
+	cb := NewContentBuffer(1024, emitterOut)
+	cb.AddArray([]byte{'a', 'b', 'c'})
 	go emitterEquals(t, emitterOut, "abc")
-	nb.Emit()
+	cb.Emit()
 }
 
 func emitterEquals(t *testing.T, emitterOut chan string, expected string) {

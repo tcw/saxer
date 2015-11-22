@@ -3,9 +3,7 @@ package main
 import (
 	"testing"
 	"bytes"
-//	"os"
 	"github.com/zacg/testify/assert"
-//"os"
 	"os"
 )
 

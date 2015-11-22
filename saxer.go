@@ -9,9 +9,10 @@ import (
 	"log"
 	"runtime/pprof"
 	"github.com/tcw/saxer/histBuffer"
-	"github.com/tcw/saxer/nodeBuffer"
+	"github.com/tcw/saxer/contentBuffer"
 	"github.com/tcw/saxer/nodePath"
 	"bytes"
+	"github.com/tcw/saxer/elementBuffer"
 )
 
 var (
@@ -19,11 +20,6 @@ var (
 	filename = kingpin.Arg("xml-file", "file").Required().String()
 	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('c').Bool()
 )
-
-type StartElement struct {
-	buffer   []byte
-	position int
-}
 
 func main() {
 	kingpin.Version("0.0.1")
@@ -48,10 +44,6 @@ func main() {
 	SaxFile(absFilename)
 }
 
-func NewStartElement(bufferSize int) StartElement {
-	return StartElement{buffer: make([]byte, bufferSize), position: 0}
-}
-
 func SaxFile(filename string) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -70,11 +62,11 @@ func emitterHandler(emitter chan string) {
 }
 
 func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuery string, emitter chan string) {
-	startElement := NewStartElement(tmpNodeBufferSize)
+	eb := elementBuffer.NewElementBuffer(tmpNodeBufferSize)
 	buffer := make([]byte, bufferSize)
 	inEscapeMode := false
 	history := histBuffer.NewHistoryBuffer(tmpNodeBufferSize)
-	nodeBuffer := nodeBuffer.NewNodeBuffer(1024 * 1024, emitter)
+	contentBuffer := contentBuffer.NewContentBuffer(1024 * 1024, emitter)
 	nodePath := nodePath.NewNodePath(1000, pathQuery)
 	isRecoding := false
 	var lineNumber uint64 = 0
@@ -86,12 +78,14 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 		if n == 0 {
 			break
 		}
-		elemStart := -1
-		elemStop := -1
+		eb.ResetLocalState()
 		for index := 0; index < n; index++ {
 			value := buffer[index]
 			if isRecoding {
-				nodeBuffer.Add(value)
+				contentBuffer.Add(value)
+			}
+			if value == 0x0A {
+				lineNumber++
 			}
 			if inEscapeMode {
 				history.Add(value)
@@ -107,46 +101,34 @@ func SaxReader(reader io.Reader, bufferSize int, tmpNodeBufferSize int, pathQuer
 				}
 				continue
 			}
-			if value == 0x0A {
-				lineNumber++
-			}
 			if value == byte('<') {
-				elemStart = index
+				eb.LocalStart = index
 			}
 			if value == byte('>') {
-				elemStop = index
+				eb.LocalEnd = index
 			}
-			if ((elemStart != -1 && index != 0 && elemStart == index - 1) && value == byte('!')) ||
-			(index == 0 && startElement.position == 1 && value == byte('!')) {
+			if ((eb.LocalStart != -1 && index != 0 && eb.LocalStart == index - 1) && value == byte('!')) ||
+			(index == 0 && eb.Position == 1 && value == byte('!')) {
 				inEscapeMode = true
-				startElement.position = 0
-				elemStart = -1
-			}else if elemStart != -1 && elemStop != -1 && startElement.position == 0 {
-				if elemStart > elemStop {
-					panic(fmt.Sprintf("Parsing error at line %d, possible syntax error", lineNumber))
-				}
-				isRecoding = ElementType(buffer[elemStart:elemStop], &nodeBuffer, &nodePath, isRecoding)
-				elemStart = -1
-				elemStop = -1
-			}else if elemStop != -1 {
-				copy(startElement.buffer[startElement.position:], buffer[:elemStop])
-				startElement.position = startElement.position + elemStop
-				isRecoding = ElementType(startElement.buffer[:startElement.position], &nodeBuffer, &nodePath, isRecoding)
-				startElement.position = 0
-				elemStop = -1
+				eb.ResetState()
+			}else if eb.LocalStart != -1 && eb.LocalEnd != -1 && eb.Position == 0 {
+				isRecoding = ElementType(buffer[eb.LocalStart:eb.LocalEnd], &contentBuffer, &nodePath, isRecoding)
+				eb.ResetLocalState()
+			}else if eb.LocalEnd != -1 {
+				eb.Add(buffer[:eb.LocalEnd])
+				isRecoding = ElementType(eb.GetBuffer(), &contentBuffer, &nodePath, isRecoding)
+				eb.ResetState()
 			}
 		}
-		if elemStart == -1 && elemStop == -1 && startElement.position > 0 {
-			copy(startElement.buffer[startElement.position:], buffer)
-			startElement.position = startElement.position + n
-		}else if elemStart != -1 {
-			copy(startElement.buffer, buffer[elemStart:n])
-			startElement.position = startElement.position + (n - elemStart)
+		if eb.LocalStart == -1 && eb.LocalEnd == -1 && eb.Position > 0 {
+			eb.Add(buffer)
+		}else if eb.LocalStart != -1 {
+			eb.Add(buffer[eb.LocalStart:n])
 		}
 	}
 }
 
-func ElementType(nodeContent []byte, nodeBuffer *nodeBuffer.NodeBuffer, nodePath *nodePath.NodePath, isRecoding bool) bool {
+func ElementType(nodeContent []byte, nodeBuffer *contentBuffer.ContentBuffer, nodePath *nodePath.NodePath, isRecoding bool) bool {
 	if nodeContent[1] == byte('/') {
 		if isRecoding {
 			if nodePath.MatchesLastMatch() {
