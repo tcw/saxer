@@ -5,38 +5,39 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var actual string = ""
+
+
+func emitterTestFn(element string) {
+	actual = element
+}
+
 func TestAdd(t *testing.T) {
-	emitterOut := make(chan string)
-	cb := NewContentBuffer(1024, emitterOut)
+	cb := NewContentBuffer(1024, emitterTestFn)
 	cb.Add(byte('a'))
 	cb.Add(byte('b'))
 	cb.Add(byte('c'))
-	go emitterEquals(t, emitterOut, "abc")
 	cb.Emit()
+	assert.Equal(t, actual, "abc")
 }
 
 func TestReset(t *testing.T) {
-	emitterOut := make(chan string)
-	cb := NewContentBuffer(1024, emitterOut)
+	cb := NewContentBuffer(1024, emitterTestFn)
 	cb.Add(byte('a'))
 	cb.Add(byte('b'))
 	cb.Add(byte('c'))
-	go emitterEquals(t, emitterOut, "abc")
 	cb.Emit()
+	assert.Equal(t, actual, "abc")
 	cb.Reset()
 	cb.Add(byte('d'))
-	go emitterEquals(t, emitterOut, "d")
 	cb.Emit();
+	assert.Equal(t, actual, "d")
 }
 
 func TestAddArray(t *testing.T) {
-	emitterOut := make(chan string)
-	cb := NewContentBuffer(1024, emitterOut)
+	cb := NewContentBuffer(1024, emitterTestFn)
 	cb.AddArray([]byte{'a', 'b', 'c'})
-	go emitterEquals(t, emitterOut, "abc")
 	cb.Emit()
+	assert.Equal(t, actual, "abc")
 }
 
-func emitterEquals(t *testing.T, emitterOut chan string, expected string) {
-	assert.Equal(t, <-emitterOut, expected)
-}

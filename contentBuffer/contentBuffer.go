@@ -3,12 +3,12 @@ package contentBuffer
 type ContentBuffer struct {
 	buf     []byte
 	pos     int
-	emitter chan string
+	emitterFn func(string)
 }
 
-func NewContentBuffer(size int, emitterChannel chan string) ContentBuffer {
+func NewContentBuffer(size int, emitter func(string)) ContentBuffer {
 	i := make([]byte, size)
-	return ContentBuffer{buf: i, pos:0, emitter:emitterChannel }
+	return ContentBuffer{buf: i, pos:0, emitterFn:emitter }
 }
 
 func (cb *ContentBuffer)Reset() {
@@ -26,7 +26,7 @@ func (cb *ContentBuffer)AddArray(b []byte) {
 }
 
 func (cb *ContentBuffer) Emit() {
-	cb.emitter <- string(cb.buf[:cb.pos])
+	cb.emitterFn(string(cb.buf[:cb.pos]))
 }
 
 
