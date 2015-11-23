@@ -14,8 +14,10 @@ import (
 )
 
 var (
-	pathExp = kingpin.Arg("pathExp", "Sax Path Expression").Required().String()
-	filename = kingpin.Arg("xml-file", "file").String()
+	query = kingpin.Arg("query", "Sax query expression").Required().String()
+	filename = kingpin.Arg("file", "xml-file").String()
+	innerXml = kingpin.Flag("inner", "Inner-xml - ChildNode").Short('i').Bool()
+
 //	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
 )
 
@@ -36,21 +38,21 @@ func main() {
 	//		defer pprof.StopCPUProfile()
 	//	}
 
-	var reader io.Reader
 	if strings.TrimSpace(*filename) != "" {
 		absFilename, err := abs(*filename)
 		if err != nil {
 			panic(err.Error())
 		}
-		reader, err := os.Open(absFilename)
+		file, err := os.Open(absFilename)
 		if err != nil {
 			panic(err.Error())
 		}
-		defer reader.Close()
+		defer file.Close()
+		SaxXmlInput(file)
 	}else {
-		reader = bufio.NewReader(os.Stdin)
+		reader := bufio.NewReader(os.Stdin)
+		SaxXmlInput(reader)
 	}
-	SaxXmlInput(reader)
 }
 
 func emitterPrinter(emitter chan string) {
@@ -66,7 +68,7 @@ func SaxXmlInput(reader io.Reader) {
 	emitter := func(element string) {
 		elemChan <- element
 	};
-	saxReader := saxReader.NewSaxReader(reader, emitter, *pathExp)
+	saxReader := saxReader.NewSaxReader(reader, emitter, *query)
 	saxReader.Read()
 }
 
