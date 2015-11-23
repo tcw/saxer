@@ -19,13 +19,15 @@ type SaxReader struct {
 	PathQuery         string
 }
 
-func NewSaxReader(reader io.Reader,emitterFn func(element string), pathQuery string) SaxReader {
-	return SaxReader{1024 * 4, 1024 * 1024 * 4, 1024 * 4, 1000, reader, emitterFn, pathQuery}
+const FOUR_KB  int = 1024 * 4
+
+func NewSaxReader(reader io.Reader, emitterFn func(element string), pathQuery string) SaxReader {
+	return SaxReader{FOUR_KB, 1024 * 1024 * 4, FOUR_KB, 1000, reader, emitterFn, pathQuery}
 }
 
 func (sr *SaxReader) Read() {
 	eb := elementBuffer.NewElementBuffer(sr.ElementBufferSize)
-	history := histBuffer.NewHistoryBuffer(1024 * 4)
+	history := histBuffer.NewHistoryBuffer(FOUR_KB)
 	contentBuffer := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
 	nodePath := nodePath.NewNodePath(sr.PathDepthSize, sr.PathQuery)
 	buffer := make([]byte, sr.ReaderBufferSize)
