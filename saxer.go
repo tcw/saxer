@@ -16,7 +16,7 @@ import (
 var (
 	query = kingpin.Arg("query", "Sax query expression").Required().String()
 	filename = kingpin.Arg("file", "xml-file").String()
-	innerXml = kingpin.Flag("inner", "Inner-xml - ChildNode").Short('i').Bool()
+	isInnerXml = kingpin.Flag("inner", "Inner-xml - ChildNode").Short('i').Default("false").Bool()
 
 //	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
 )
@@ -68,7 +68,7 @@ func SaxXmlInput(reader io.Reader) {
 	emitter := func(element string) {
 		elemChan <- element
 	};
-	saxReader := saxReader.NewSaxReader(reader, emitter, *query)
+	saxReader := saxReader.NewSaxReader(reader, emitter, *query, *isInnerXml)
 	saxReader.Read()
 }
 

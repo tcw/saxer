@@ -17,7 +17,8 @@ func newTestSaxReader(reader io.Reader, emitterTestFn func(string), query string
 		PathDepthSize:10,
 		Reader:reader,
 		EmitterFn : emitterTestFn,
-		PathQuery:query}
+		PathQuery:query,
+		IsInnerXml:false}
 }
 
 func TestParseXmlOneNode(t *testing.T) {
@@ -41,6 +42,19 @@ func TestParseXmlOneNodeEmptySearch(t *testing.T) {
 	saxReader.Read()
 	assert.Equal(t, res, "")
 }
+
+func TestParseInnerXmlOneNode(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("<hello>test</hello>"))
+	saxReader := newTestSaxReader(reader, emitter, "hello")
+	saxReader.IsInnerXml = true
+	saxReader.Read()
+	assert.Equal(t, res, "test")
+}
+
 
 func TestParseXmlNodeConstrainedBuffer(t *testing.T) {
 	res := ""

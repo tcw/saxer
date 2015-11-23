@@ -25,6 +25,10 @@ func (cb *ContentBuffer)AddArray(b []byte) {
 	cb.pos = cb.pos + len(b)
 }
 
+func (cb *ContentBuffer)Backup(step int) {
+	cb.pos = cb.pos - step
+}
+
 func (cb *ContentBuffer) Emit() {
 	cb.emitterFn(string(cb.buf[:cb.pos]))
 }
