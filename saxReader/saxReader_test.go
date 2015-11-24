@@ -127,37 +127,16 @@ func TestParseXmlNodesWithCdataAndComment(t *testing.T) {
 }
 
 func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
-	var actuals []string = make([]string,10)
+	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string){
+	emitter := func(element string) {
 		actuals[actualsPos] = element
 		actualsPos++
 	};
 	reader := bytes.NewReader([]byte("<helloA><!-- test<>--<><--><helloB><helloC><![CDATA[Hello<! World!]]></helloC><helloC>C2</helloC></helloB></helloA>"))
-	saxReader := newTestSaxReader(reader,emitter, "helloA/helloB/helloC")
+	saxReader := newTestSaxReader(reader, emitter, "helloA/helloB/helloC")
 	saxReader.ReaderBufferSize = 1
 	saxReader.Read()
 	assert.Equal(t, actuals[0], "<helloC><![CDATA[Hello<! World!]]></helloC>")
 	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
-}
-
-func TestParseWithEscapeAndCDATA(t *testing.T) {
-	var actuals []string = make([]string,10)
-	var actualsPos int = 0
-	emitter := func(element string){
-		actuals[actualsPos] = element
-		actualsPos++
-	};
-	reader,err := os.Open("test.xml")
-	if err != nil{
-		t.Error(err)
-	}
-	saxReader := newTestSaxReader(reader,emitter, "mediawiki/page/revision/contributor/id")
-	saxReader.ElementBufferSize = 100
-	saxReader.Read()
-	assert.Equal(t, actuals[0], "<id>14954744</id>")
-	assert.Equal(t, actuals[1], "<id>3761856</id>")
-	assert.Equal(t, actuals[2],  "<id>12070</id>")
-	assert.Equal(t, actuals[3], "<id>212624</id>")
-	assert.Equal(t, actuals[4], "<id>6569922</id>")
 }
