@@ -7,6 +7,7 @@ import (
 	"github.com/tcw/saxer/nodePath"
 	"bytes"
 	"github.com/tcw/saxer/elementBuffer"
+	"github.com/tcw/saxer/htmlConverter"
 )
 
 type SaxReader struct {
@@ -32,7 +33,10 @@ func (sr *SaxReader) Read() {
 	history := histBuffer.NewHistoryBuffer(FOUR_KB)
 	contentBuffer := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
 	nodePath := nodePath.NewNodePath(sr.PathDepthSize, sr.PathQuery)
+	conv := htmlConverter.NewHtmlConverter()
 	buffer := make([]byte, sr.ReaderBufferSize)
+	htmlBuffer := make([]byte, sr.ReaderBufferSize)
+	convBuffer := make([]byte, 100)
 
 	inEscapeMode := false
 	isRecoding := false
@@ -46,9 +50,18 @@ func (sr *SaxReader) Read() {
 		if n == 0 {
 			break
 		}
-		eb.ResetLocalState()
+
+		hidx := 0
 		for index := 0; index < n; index++ {
-			value := buffer[index]
+			cn := conv.Translate(convBuffer, buffer[index])
+			for ic := 0; ic < cn; ic++ {
+				htmlBuffer[hidx] = convBuffer[ic]
+				hidx ++
+			}
+		}
+		eb.ResetLocalState()
+		for index := 0; index < hidx; index++ {
+			value := htmlBuffer[index]
 			if isRecoding {
 				contentBuffer.Add(value)
 			}
@@ -80,18 +93,18 @@ func (sr *SaxReader) Read() {
 				inEscapeMode = true
 				eb.ResetState()
 			}else if eb.LocalStart != -1 && eb.LocalEnd != -1 && eb.Position == 0 {
-				isRecoding = ElementType(buffer[eb.LocalStart:eb.LocalEnd], &contentBuffer, &nodePath, isRecoding,sr.IsInnerXml)
+				isRecoding = ElementType(htmlBuffer[eb.LocalStart:eb.LocalEnd], &contentBuffer, &nodePath, isRecoding,sr.IsInnerXml)
 				eb.ResetLocalState()
 			}else if eb.LocalEnd != -1 {
-				eb.Add(buffer[:eb.LocalEnd])
+				eb.Add(htmlBuffer[:eb.LocalEnd])
 				isRecoding = ElementType(eb.GetBuffer(), &contentBuffer, &nodePath, isRecoding,sr.IsInnerXml)
 				eb.ResetState()
 			}
 		}
 		if eb.LocalStart == -1 && eb.LocalEnd == -1 && eb.Position > 0 {
-			eb.Add(buffer)
+			eb.Add(htmlBuffer)
 		}else if eb.LocalStart != -1 {
-			eb.Add(buffer[eb.LocalStart:n])
+			eb.Add(htmlBuffer[eb.LocalStart:hidx])
 		}
 	}
 }

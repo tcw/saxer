@@ -29,7 +29,7 @@ func NewHtmlConverter() HtmlConverter {
 	st[4][1] = ';'
 	st[5][0] = ';'
 
-	return HtmlConverter{state:st, stateNum:0,buffer:make([]byte,4096), bufferPos:0}
+	return HtmlConverter{state:st, stateNum:0,buffer:make([]byte,100), bufferPos:0}
 }
 
 func (hc *HtmlConverter)Translate(dest []byte, b byte) int {
@@ -56,15 +56,27 @@ func (hc *HtmlConverter)Translate(dest []byte, b byte) int {
 		return pos+1
 	}
 	if hc.stateNum == 1020304050 {
+		hc.stateNum = 0
+		hc.stateLevel = 0
+		hc.bufferPos = 0
 		copy(dest, []byte{'"'})
 		return 1
 	}else if hc.stateNum == 1121314100 {
+		hc.stateNum = 0
+		hc.stateLevel = 0
+		hc.bufferPos = 0
 		copy(dest, []byte{'&'})
 		return 1
 	}else if hc.stateNum == 1222320000 {
+		hc.stateNum = 0
+		hc.stateLevel = 0
+		hc.bufferPos = 0
 		copy(dest, []byte{'<'})
 		return 1
 	}else if hc.stateNum == 1322320000 {
+		hc.stateNum = 0
+		hc.stateLevel = 0
+		hc.bufferPos = 0
 		copy(dest, []byte{'>'})
 		return 1
 	}
