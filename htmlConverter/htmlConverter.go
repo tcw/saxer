@@ -22,11 +22,13 @@ func NewHtmlConverter() HtmlConverter {
 	st[2][0] = 'u'
 	st[2][1] = 'm'
 	st[2][2] = 't'
+	st[2][3] = 'p'
 	st[3][0] = 'o'
 	st[3][1] = 'p'
 	st[3][2] = ';'
 	st[4][0] = 't'
 	st[4][1] = ';'
+	st[4][2] = 's'
 	st[5][0] = ';'
 
 	return HtmlConverter{state:st, stateNum:0,buffer:make([]byte,100), bufferPos:0}
@@ -50,37 +52,37 @@ func (hc *HtmlConverter)Translate(dest []byte, b byte) int {
 			copy(dest, hc.buffer[:pos])
 		}
 		dest[pos] = b
-		hc.stateNum = 0
-		hc.stateLevel = 0
-		hc.bufferPos = 0
+		hc.clear()
 		return pos+1
 	}
 	if hc.stateNum == 1020304050 {
-		hc.stateNum = 0
-		hc.stateLevel = 0
-		hc.bufferPos = 0
 		copy(dest, []byte{'"'})
+		hc.clear()
 		return 1
 	}else if hc.stateNum == 1121314100 {
-		hc.stateNum = 0
-		hc.stateLevel = 0
-		hc.bufferPos = 0
 		copy(dest, []byte{'&'})
+		hc.clear()
 		return 1
 	}else if hc.stateNum == 1222320000 {
-		hc.stateNum = 0
-		hc.stateLevel = 0
-		hc.bufferPos = 0
 		copy(dest, []byte{'<'})
+		hc.clear()
 		return 1
 	}else if hc.stateNum == 1322320000 {
-		hc.stateNum = 0
-		hc.stateLevel = 0
-		hc.bufferPos = 0
 		copy(dest, []byte{'>'})
+		hc.clear()
+		return 1
+	}else if hc.stateNum == 1123304250 {
+		copy(dest, []byte{'>'})
+		hc.clear()
 		return 1
 	}
 	return 0
+}
+
+func (hc *HtmlConverter) clear()  {
+	hc.stateNum = 0
+	hc.stateLevel = 0
+	hc.bufferPos = 0
 }
 
 

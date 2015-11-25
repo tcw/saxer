@@ -79,6 +79,10 @@ func (sr *SaxReader) Read() {
 						inEscapeMode = false
 						continue
 					}
+					if history.HasLast([]byte{'?', '>'}) {
+						inEscapeMode = false
+						continue
+					}
 				}
 				continue
 			}
@@ -88,8 +92,8 @@ func (sr *SaxReader) Read() {
 			if value == byte('>') {
 				eb.LocalEnd = index
 			}
-			if ((eb.LocalStart != -1 && index != 0 && eb.LocalStart == index - 1) && value == byte('!')) ||
-			(index == 0 && eb.Position == 1 && value == byte('!')) {
+			if ((eb.LocalStart != -1 && index != 0 && eb.LocalStart == index - 1) && (value == byte('!') || value == byte('?'))) ||
+			(index == 0 && eb.Position == 1 && (value == byte('!') || value == byte('?'))) {
 				inEscapeMode = true
 				eb.ResetState()
 			}else if eb.LocalStart != -1 && eb.LocalEnd != -1 && eb.Position == 0 {

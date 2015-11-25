@@ -152,3 +152,17 @@ func TestParseXmlNodesWithEscape(t *testing.T) {
 	assert.Equal(t, actuals[0], "<helloC><![CDATA[Hello<! World!]]></helloC>")
 	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
 }
+
+func TestParseXmlNodesWithEscapeAndXmlTag(t *testing.T) {
+	var actuals []string = make([]string, 100)
+	var actualsPos int = 0
+	emitter := func(element string) {
+		actuals[actualsPos] = element
+		actualsPos++
+	};
+	reader := bytes.NewReader([]byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?><helloA><!-- test<>--<><--><helloB><helloC><?xml version=\"1.0\" encoding=\"UTF-8\"?>&lt;![CDATA[Hello<! World!]]></helloC>&lt;helloC>C2</helloC></helloB></helloA>"))
+	saxReader := newTestSaxReader(reader, emitter, "helloA/helloB/helloC")
+	saxReader.Read()
+	assert.Equal(t, actuals[0], "<helloC><?xml version=\"1.0\" encoding=\"UTF-8\"?><![CDATA[Hello<! World!]]></helloC>")
+	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
+}
