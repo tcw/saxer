@@ -24,7 +24,6 @@ type SaxReader struct {
 
 const FOUR_KB  int = 1024 * 4
 
-
 func NewSaxReader(reader io.Reader, emitterFn func(element string), pathQuery string, isInnerXml bool, filterEscape bool) SaxReader {
 	return SaxReader{FOUR_KB, 1024 * 1024 * 4, FOUR_KB, 1000, reader, emitterFn, pathQuery, isInnerXml, filterEscape}
 }

@@ -18,6 +18,7 @@ var (
 	filename = kingpin.Arg("file", "xml-file").String()
 	isInnerXml = kingpin.Flag("inner", "Inner-xml of selected element (defalut false)").Short('i').Default("false").Bool()
 	htmlConv = kingpin.Flag("htmlconv", "Converting html escape to ascii (defalut false)").Short('c').Default("false").Bool()
+	count = kingpin.Flag("count", "Number of matches (defalut false)").Short('n').Default("false").Bool()
 
 //	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
 )
@@ -62,15 +63,27 @@ func emitterPrinter(emitter chan string) {
 	}
 }
 
+
+
 func SaxXmlInput(reader io.Reader) {
-	elemChan := make(chan string, 100)
-	defer close(elemChan)
-	go emitterPrinter(elemChan)
-	emitter := func(element string) {
-		elemChan <- element
-	};
-	saxReader := saxReader.NewSaxReader(reader, emitter, *query, *isInnerXml,*htmlConv)
-	saxReader.Read()
+	if *count {
+		var counter uint64 = 0
+		emitterCounter := func(element string) {
+			counter++
+		};
+		saxReader := saxReader.NewSaxReader(reader, emitterCounter, *query, *isInnerXml, *htmlConv)
+		saxReader.Read()
+		fmt.Println(counter)
+	}else {
+		elemChan := make(chan string, 100)
+		defer close(elemChan)
+		go emitterPrinter(elemChan)
+		emitter := func(element string) {
+			elemChan <- element
+		};
+		saxReader := saxReader.NewSaxReader(reader, emitter, *query, *isInnerXml, *htmlConv)
+		saxReader.Read()
+	}
 }
 
 
