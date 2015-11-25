@@ -18,14 +18,15 @@ type SaxReader struct {
 	Reader            io.Reader
 	EmitterFn         func(string)
 	PathQuery         string
-	IsInnerXml		  bool
+	IsInnerXml        bool
+	FilterEscapeSigns bool
 }
 
 const FOUR_KB  int = 1024 * 4
 
 
-func NewSaxReader(reader io.Reader, emitterFn func(element string), pathQuery string,isInnerXml bool) SaxReader {
-	return SaxReader{FOUR_KB, 1024 * 1024 * 4, FOUR_KB, 1000, reader, emitterFn, pathQuery,isInnerXml}
+func NewSaxReader(reader io.Reader, emitterFn func(element string), pathQuery string, isInnerXml bool, filterEscape bool) SaxReader {
+	return SaxReader{FOUR_KB, 1024 * 1024 * 4, FOUR_KB, 1000, reader, emitterFn, pathQuery, isInnerXml, filterEscape}
 }
 
 func (sr *SaxReader) Read() {
@@ -35,9 +36,7 @@ func (sr *SaxReader) Read() {
 	nodePath := nodePath.NewNodePath(sr.PathDepthSize, sr.PathQuery)
 	conv := htmlConverter.NewHtmlConverter()
 	buffer := make([]byte, sr.ReaderBufferSize)
-	htmlBuffer := make([]byte, sr.ReaderBufferSize)
 	convBuffer := make([]byte, 100)
-
 	inEscapeMode := false
 	isRecoding := false
 	var lineNumber uint64 = 0
@@ -50,18 +49,22 @@ func (sr *SaxReader) Read() {
 		if n == 0 {
 			break
 		}
-
 		hidx := 0
-		for index := 0; index < n; index++ {
-			cn := conv.Translate(convBuffer, buffer[index])
-			for ic := 0; ic < cn; ic++ {
-				htmlBuffer[hidx] = convBuffer[ic]
-				hidx ++
+		if sr.FilterEscapeSigns {
+			for index := 0; index < n; index++ {
+				cn := conv.Translate(convBuffer, buffer[index])
+				for ic := 0; ic < cn; ic++ {
+					buffer[hidx] = convBuffer[ic]
+					hidx ++
+				}
 			}
+		}else {
+			hidx = n
 		}
+
 		eb.ResetLocalState()
 		for index := 0; index < hidx; index++ {
-			value := htmlBuffer[index]
+			value := buffer[index]
 			if isRecoding {
 				contentBuffer.Add(value)
 			}
@@ -97,28 +100,28 @@ func (sr *SaxReader) Read() {
 				inEscapeMode = true
 				eb.ResetState()
 			}else if eb.LocalStart != -1 && eb.LocalEnd != -1 && eb.Position == 0 {
-				isRecoding = ElementType(htmlBuffer[eb.LocalStart:eb.LocalEnd], &contentBuffer, &nodePath, isRecoding,sr.IsInnerXml)
+				isRecoding = ElementType(buffer[eb.LocalStart:eb.LocalEnd], &contentBuffer, &nodePath, isRecoding, sr.IsInnerXml)
 				eb.ResetLocalState()
 			}else if eb.LocalEnd != -1 {
-				eb.Add(htmlBuffer[:eb.LocalEnd])
-				isRecoding = ElementType(eb.GetBuffer(), &contentBuffer, &nodePath, isRecoding,sr.IsInnerXml)
+				eb.Add(buffer[:eb.LocalEnd])
+				isRecoding = ElementType(eb.GetBuffer(), &contentBuffer, &nodePath, isRecoding, sr.IsInnerXml)
 				eb.ResetState()
 			}
 		}
 		if eb.LocalStart == -1 && eb.LocalEnd == -1 && eb.Position > 0 {
-			eb.Add(htmlBuffer)
+			eb.Add(buffer)
 		}else if eb.LocalStart != -1 {
-			eb.Add(htmlBuffer[eb.LocalStart:hidx])
+			eb.Add(buffer[eb.LocalStart:hidx])
 		}
 	}
 }
 
-func ElementType(nodeContent []byte, contentBuffer *contentBuffer.ContentBuffer, nodePath *nodePath.NodePath, isRecoding bool,isInnerXml bool) bool {
+func ElementType(nodeContent []byte, contentBuffer *contentBuffer.ContentBuffer, nodePath *nodePath.NodePath, isRecoding bool, isInnerXml bool) bool {
 	if nodeContent[1] == byte('/') {
 		if isRecoding {
 			if nodePath.MatchesLastMatch() {
-				if isInnerXml{
-					contentBuffer.Backup(len(nodeContent)+1)
+				if isInnerXml {
+					contentBuffer.Backup(len(nodeContent) + 1)
 				}
 				contentBuffer.Emit()
 				contentBuffer.Reset()
@@ -148,7 +151,7 @@ func ElementType(nodeContent []byte, contentBuffer *contentBuffer.ContentBuffer,
 		nodePath.Add(nodename)
 		if !isRecoding {
 			if nodePath.MatchesPath() {
-				if !isInnerXml{
+				if !isInnerXml {
 					contentBuffer.AddArray(nodeContent)
 					contentBuffer.Add(byte('>'))
 				}

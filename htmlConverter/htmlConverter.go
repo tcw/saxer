@@ -72,7 +72,7 @@ func (hc *HtmlConverter)Translate(dest []byte, b byte) int {
 		hc.clear()
 		return 1
 	}else if hc.stateNum == 1123304250 {
-		copy(dest, []byte{'>'})
+		copy(dest, []byte{'\''})
 		hc.clear()
 		return 1
 	}

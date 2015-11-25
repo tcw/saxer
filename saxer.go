@@ -16,13 +16,14 @@ import (
 var (
 	query = kingpin.Arg("query", "Sax query expression").Required().String()
 	filename = kingpin.Arg("file", "xml-file").String()
-	isInnerXml = kingpin.Flag("inner", "Inner-xml - ChildNode").Short('i').Default("false").Bool()
+	isInnerXml = kingpin.Flag("inner", "Inner-xml of selected element (defalut false)").Short('i').Default("false").Bool()
+	htmlConv = kingpin.Flag("htmlconv", "Converting html escape to ascii (defalut false)").Short('c').Default("false").Bool()
 
 //	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
 )
 
 func main() {
-	kingpin.Version("0.0.1")
+	kingpin.Version("0.0.2")
 	kingpin.Parse()
 
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
@@ -68,7 +69,7 @@ func SaxXmlInput(reader io.Reader) {
 	emitter := func(element string) {
 		elemChan <- element
 	};
-	saxReader := saxReader.NewSaxReader(reader, emitter, *query, *isInnerXml)
+	saxReader := saxReader.NewSaxReader(reader, emitter, *query, *isInnerXml,*htmlConv)
 	saxReader.Read()
 }
 
