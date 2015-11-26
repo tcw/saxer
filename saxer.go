@@ -66,13 +66,14 @@ func emitterPrinter(emitter chan string) {
 
 
 func SaxXmlInput(reader io.Reader) {
+	var err error
 	if *count {
 		var counter uint64 = 0
 		emitterCounter := func(element string) {
 			counter++
 		};
 		saxReader := saxReader.NewSaxReader(reader, emitterCounter, *query, *isInnerXml, *htmlConv)
-		saxReader.Read()
+		err = saxReader.Read()
 		fmt.Println(counter)
 	}else {
 		elemChan := make(chan string, 100)
@@ -82,7 +83,10 @@ func SaxXmlInput(reader io.Reader) {
 			elemChan <- element
 		};
 		saxReader := saxReader.NewSaxReader(reader, emitter, *query, *isInnerXml, *htmlConv)
-		saxReader.Read()
+		err = saxReader.Read()
+	}
+	if err != nil {
+		panic(err)
 	}
 }
 

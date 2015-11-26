@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"github.com/tcw/saxer/elementBuffer"
 	"github.com/tcw/saxer/htmlConverter"
+	"github.com/syndtr/goleveldb/leveldb/errors"
+	"fmt"
 )
 
 type SaxReader struct {
@@ -28,7 +30,7 @@ func NewSaxReader(reader io.Reader, emitterFn func(element string), pathQuery st
 	return SaxReader{FOUR_KB, 1024 * 1024 * 4, FOUR_KB, 1000, reader, emitterFn, pathQuery, isInnerXml, filterEscape}
 }
 
-func (sr *SaxReader) Read() {
+func (sr *SaxReader) Read() error {
 	eb := elementBuffer.NewElementBuffer(sr.ElementBufferSize)
 	history := histBuffer.NewHistoryBuffer(FOUR_KB)
 	contentBuffer := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
@@ -89,9 +91,15 @@ func (sr *SaxReader) Read() {
 				continue
 			}
 			if value == byte('<') {
+				if eb.LocalStart != -1 || eb.Position > 0 {
+					return errors.New(fmt.Sprintf("Validation error found two '<' chars in a row (last on line %d)", lineNumber + 1))
+				}
 				eb.LocalStart = index
 			}
 			if value == byte('>') {
+				if eb.LocalStart == -1 && eb.Position == 0 {
+					return errors.New(fmt.Sprintf("Validation error found two '>' chars in a row (last on line %d)", lineNumber + 1))
+				}
 				eb.LocalEnd = index
 			}
 			if ((eb.LocalStart != -1 && index != 0 && eb.LocalStart == index - 1) && (value == byte('!') || value == byte('?'))) ||
@@ -113,6 +121,7 @@ func (sr *SaxReader) Read() {
 			eb.Add(buffer[eb.LocalStart:hidx])
 		}
 	}
+	return nil
 }
 
 func ElementType(nodeContent []byte, contentBuffer *contentBuffer.ContentBuffer, nodePath *nodePath.NodePath, isRecoding bool, isInnerXml bool) bool {
