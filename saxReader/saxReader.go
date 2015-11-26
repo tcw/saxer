@@ -17,33 +17,36 @@ type SaxReader struct {
 	ContentBufferSize int
 	ReaderBufferSize  int
 	PathDepthSize     int
-	Reader            io.Reader
 	EmitterFn         func(string)
-	PathQuery         string
 	IsInnerXml        bool
 	FilterEscapeSigns bool
 }
 
-const FOUR_KB  int = 1024 * 4
+const ONE_KB  int = 1024
+const ONE_MB  int = ONE_KB * ONE_KB
 
-func NewSaxReader(reader io.Reader, emitterFn func(element string), pathQuery string, isInnerXml bool, filterEscape bool) SaxReader {
-	return SaxReader{FOUR_KB, 1024 * 1024 * 4, FOUR_KB, 1000, reader, emitterFn, pathQuery, isInnerXml, filterEscape}
+func NewSaxReader(emitterFn func(element string), isInnerXml bool, filterEscape bool) SaxReader {
+	return SaxReader{ONE_KB * 4, ONE_MB * 4, ONE_KB * 4, 1000, emitterFn, isInnerXml, filterEscape}
 }
 
-func (sr *SaxReader) Read() error {
+func NewSaxReaderNoEmitter() SaxReader {
+	return SaxReader{ONE_KB * 4, ONE_MB * 4, ONE_KB * 4, 1000, nil, false, false}
+}
+
+func (sr *SaxReader) Read(reader io.Reader, query string) error {
 	eb := elementBuffer.NewElementBuffer(sr.ElementBufferSize)
-	history := histBuffer.NewHistoryBuffer(FOUR_KB)
+	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
 	contentBuffer := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
-	nodePath := nodePath.NewNodePath(sr.PathDepthSize, sr.PathQuery)
+	nodePath := nodePath.NewNodePath(sr.PathDepthSize, query)
 	conv := htmlConverter.NewHtmlConverter()
 	buffer := make([]byte, sr.ReaderBufferSize)
-	convBuffer := make([]byte, 100)
+	convBuffer := make([]byte, ONE_KB)
 	inEscapeMode := false
 	isRecoding := false
 	var lineNumber uint64 = 0
 
 	for {
-		n, err := sr.Reader.Read(buffer)
+		n, err := reader.Read(buffer)
 		if n != 0 && err != nil {
 			panic("Error while reading xml")
 		}
@@ -62,7 +65,6 @@ func (sr *SaxReader) Read() error {
 		}else {
 			hidx = n
 		}
-
 		eb.ResetLocalState()
 		for index := 0; index < hidx; index++ {
 			value := buffer[index]

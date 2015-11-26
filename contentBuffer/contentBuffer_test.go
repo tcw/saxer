@@ -7,7 +7,6 @@ import (
 
 var actual string = ""
 
-
 func emitterTestFn(element string) {
 	actual = element
 }

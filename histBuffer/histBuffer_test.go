@@ -14,7 +14,6 @@ func TestGetLast2(t *testing.T) {
 	assert.Equal(t,last,[]byte{'c','d'})
 }
 
-
 func TestGetLastSwich(t *testing.T) {
 	hb := NewHistoryBuffer(3)
 	hb.Add(byte('a'))
