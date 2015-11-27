@@ -5,10 +5,11 @@ type ElementBuffer struct {
 	Position   int
 	LocalStart int
 	LocalEnd   int
+	StartTags  int
 }
 
 func NewElementBuffer(bufferSize int) ElementBuffer {
-	return ElementBuffer{buffer: make([]byte, bufferSize), Position: 0, LocalStart:-1, LocalEnd:-1}
+	return ElementBuffer{buffer: make([]byte, bufferSize), Position: 0, LocalStart:-1, LocalEnd:-1, StartTags:0}
 }
 
 func (eb *ElementBuffer) ResetLocalState() {
@@ -27,6 +28,6 @@ func (eb *ElementBuffer) Add(b []byte) {
 	eb.Position = eb.Position + len(b)
 }
 
-func (eb *ElementBuffer) GetBuffer() []byte{
+func (eb *ElementBuffer) GetBuffer() []byte {
 	return eb.buffer[:eb.Position]
 }

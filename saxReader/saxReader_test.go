@@ -4,6 +4,7 @@ import (
 	"testing"
 	"bytes"
 	"github.com/zacg/testify/assert"
+	"fmt"
 )
 
 
@@ -183,5 +184,17 @@ func TestParseXmlOneNodeWithLtError(t *testing.T) {
 	reader := bytes.NewReader([]byte("<he<llo>test</hello>"))
 	saxReader := newTestSaxReader(emitter)
 	err := saxReader.Read(reader, "hello")
+	assert.NotNil(t, err)
+}
+
+func TestParseXmlOneNodeWithEndElementBeforeStartElementError(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("</hello>test</hello>"))
+	saxReader := newTestSaxReader(emitter)
+	err := saxReader.Read(reader, "hello")
+	fmt.Println(err)
 	assert.NotNil(t, err)
 }
