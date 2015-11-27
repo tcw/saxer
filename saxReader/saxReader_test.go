@@ -163,7 +163,7 @@ func TestParseXmlNodesWithEscape(t *testing.T) {
 	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
 }
 
-func TestParseXmlNodesWithEscapeTag(t *testing.T) {
+func TestParseXmlNodesWithLtEscapeTag(t *testing.T) {
 	res := ""
 	emitter := func(element string) {
 		res = element
