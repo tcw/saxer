@@ -99,10 +99,9 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 				eb.LocalStart = index
 			}
 			if value == byte('>') {
-				if eb.LocalStart == -1 && eb.Position == 0 {
-					return errors.New(fmt.Sprintf("Validation error found two '>' chars in a row (last on line %d)", lineNumber + 1))
+				if eb.LocalStart != -1 || eb.Position > 0 {
+					eb.LocalEnd = index
 				}
-				eb.LocalEnd = index
 			}
 			if ((eb.LocalStart != -1 && index != 0 && eb.LocalStart == index - 1) && (value == byte('!') || value == byte('?'))) ||
 			(index == 0 && eb.Position == 1 && (value == byte('!') || value == byte('?'))) {
