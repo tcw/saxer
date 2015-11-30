@@ -11,40 +11,6 @@ type TagMatcher struct {
 	lastMatchPos  int
 }
 
-type attribute struct {
-	key   string
-	value string
-}
-
-type tag struct {
-	name         string
-	attributes   []attribute
-	attributePos int
-}
-
-func (t *tag) addAttribute(attr attribute)  {
-	t.attributes[t.attributePos] = attr
-	t.attributePos++
-}
-
-type tagPath struct {
-	path    []tag
-	pathPos int
-}
-
-func NewTagPath() {
-	return tagPath{make([]tag, 10),0}
-}
-
-func (tp *tagPath) AddTag(t tag) {
-	tp.path[tp.pathPos] = t
-	tp.pathPos++
-}
-
-func NewTag(name string) {
-	tag{name, make([]attribute, 10), 0}
-}
-
 // username?id=34&ref=23/name
 func NewTagMatcher(size int, query string) TagMatcher {
 	path := make([]string, size)
