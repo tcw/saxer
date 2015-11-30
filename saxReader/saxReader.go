@@ -7,7 +7,6 @@ import (
 	"github.com/tcw/saxer/nodePath"
 	"bytes"
 	"github.com/tcw/saxer/elementBuffer"
-	"github.com/tcw/saxer/htmlConverter"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"fmt"
 	"github.com/hashicorp/errwrap"
@@ -30,7 +29,7 @@ func NewSaxReader(emitterFn func(element string), isInnerXml bool) SaxReader {
 }
 
 func NewSaxReaderNoEmitter() SaxReader {
-	return SaxReader{ONE_KB * 4, ONE_MB * 4, ONE_KB * 4, 1000, nil, false, false}
+	return SaxReader{ONE_KB * 4, ONE_MB * 4, ONE_KB * 4, 1000, nil, false}
 }
 
 func (sr *SaxReader) Read(reader io.Reader, query string) error {
