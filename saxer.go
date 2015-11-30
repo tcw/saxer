@@ -17,7 +17,6 @@ var (
 	query = kingpin.Arg("query", "Sax query expression").Required().String()
 	filename = kingpin.Arg("file", "xml-file").String()
 	isInnerXml = kingpin.Flag("inner", "Inner-xml of selected element (default false)").Short('i').Default("false").Bool()
-	htmlConv = kingpin.Flag("htmlconv", "Converting html escape to ascii (default false)").Short('c').Default("false").Bool()
 	count = kingpin.Flag("count", "Number of matches (default false)").Short('n').Default("false").Bool()
 	contentBuffer = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Short('e').Default("4").Int()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Short('t').Default("4").Int()
@@ -29,7 +28,7 @@ const ONE_KB  int = 1024
 const ONE_MB  int = ONE_KB * ONE_KB
 
 func main() {
-	kingpin.Version("0.0.2")
+	kingpin.Version("0.0.3")
 	kingpin.Parse()
 
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
@@ -73,7 +72,6 @@ func SaxXmlInput(reader io.Reader) {
 	var sr saxReader.SaxReader
 	sr = saxReader.NewSaxReaderNoEmitter()
 	sr.IsInnerXml = *isInnerXml
-	sr.FilterEscapeSigns = *htmlConv
 	sr.ContentBufferSize = *contentBuffer * ONE_MB
 	sr.ElementBufferSize = *tagBuffer * ONE_KB
 	if *count {

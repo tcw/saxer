@@ -3,7 +3,7 @@ import (
 	"math"
 )
 
-
+//TODO: could be used in emitter?
 type HtmlConverter struct {
 	state      [6][6]byte
 	stateNum   int64
