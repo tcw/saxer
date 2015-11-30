@@ -20,14 +20,13 @@ type SaxReader struct {
 	PathDepthSize     int
 	EmitterFn         func(string)
 	IsInnerXml        bool
-	FilterEscapeSigns bool
 }
 
 const ONE_KB  int = 1024
 const ONE_MB  int = ONE_KB * ONE_KB
 
-func NewSaxReader(emitterFn func(element string), isInnerXml bool, filterEscape bool) SaxReader {
-	return SaxReader{ONE_KB * 4, ONE_MB * 4, ONE_KB * 4, 1000, emitterFn, isInnerXml, filterEscape}
+func NewSaxReader(emitterFn func(element string), isInnerXml bool) SaxReader {
+	return SaxReader{ONE_KB * 4, ONE_MB * 4, ONE_KB * 4, 1000, emitterFn, isInnerXml}
 }
 
 func NewSaxReaderNoEmitter() SaxReader {
@@ -39,9 +38,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
 	contentBuffer := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
 	nodePath := nodePath.NewNodePath(sr.PathDepthSize, query)
-	conv := htmlConverter.NewHtmlConverter()
 	buffer := make([]byte, sr.ReaderBufferSize)
-	convBuffer := make([]byte, ONE_KB)
 	inEscapeMode := false
 	isRecoding := false
 	var lineNumber uint64 = 0
@@ -54,20 +51,8 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 		if n == 0 {
 			break
 		}
-		hidx := 0
-		if sr.FilterEscapeSigns {
-			for index := 0; index < n; index++ {
-				cn := conv.Translate(convBuffer, buffer[index])
-				for ic := 0; ic < cn; ic++ {
-					buffer[hidx] = convBuffer[ic]
-					hidx ++
-				}
-			}
-		}else {
-			hidx = n
-		}
 		eb.ResetLocalState()
-		for index := 0; index < hidx; index++ {
+		for index := 0; index < n; index++ {
 			value := buffer[index]
 			if isRecoding {
 				contentBuffer.Add(value)
@@ -126,7 +111,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 		if eb.LocalStart == -1 && eb.LocalEnd == -1 && eb.Position > 0 {
 			eb.Add(buffer)
 		}else if eb.LocalStart != -1 {
-			eb.Add(buffer[eb.LocalStart:hidx])
+			eb.Add(buffer[eb.LocalStart:n])
 		}
 	}
 	return nil

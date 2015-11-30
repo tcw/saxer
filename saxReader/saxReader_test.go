@@ -15,7 +15,6 @@ func newTestSaxReader(emitterTestFn func(string)) SaxReader {
 		PathDepthSize:10,
 		EmitterFn : emitterTestFn,
 		IsInnerXml:false,
-		FilterEscapeSigns:false,
 	}
 }
 
@@ -142,22 +141,6 @@ func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 	reader := bytes.NewReader([]byte("<helloA><!-- test<>--<><--><helloB><helloC><![CDATA[Hello<! World!]]></helloC><helloC>C2</helloC></helloB></helloA>"))
 	saxReader := newTestSaxReader(emitter)
 	saxReader.ReaderBufferSize = 1
-	err := saxReader.Read(reader, "helloA/helloB/helloC")
-	assert.Nil(t, err)
-	assert.Equal(t, actuals[0], "<helloC><![CDATA[Hello<! World!]]></helloC>")
-	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
-}
-
-func TestParseXmlNodesWithEscape(t *testing.T) {
-	var actuals []string = make([]string, 10)
-	var actualsPos int = 0
-	emitter := func(element string) {
-		actuals[actualsPos] = element
-		actualsPos++
-	};
-	reader := bytes.NewReader([]byte("<helloA><!-- test<>--<><--><helloB><helloC>&lt;![CDATA[Hello<! World!]]></helloC>&lt;helloC>C2</helloC></helloB></helloA>"))
-	saxReader := newTestSaxReader(emitter)
-	saxReader.FilterEscapeSigns = true
 	err := saxReader.Read(reader, "helloA/helloB/helloC")
 	assert.Nil(t, err)
 	assert.Equal(t, actuals[0], "<helloC><![CDATA[Hello<! World!]]></helloC>")
