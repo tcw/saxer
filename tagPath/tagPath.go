@@ -34,3 +34,7 @@ func (t *Tag) Add(attr Attribute)  {
 	t.Attributes[t.AttributePos] = attr
 	t.AttributePos++
 }
+
+func (t *TagPath) RemoveLast()  {
+	t.PathPos--
+}

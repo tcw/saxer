@@ -1,45 +1,47 @@
 package tagMatcher
 import (
 	"strings"
+	"github.com/tcw/saxer/tagPath"
+	"github.com/tcw/saxer/queryParser"
+	"fmt"
 )
 
 type TagMatcher struct {
-	pathQuery     []string
-	path          []string
+	query         tagPath.TagPath
+	path          tagPath.TagPath
 	lastMatchPath []string
-	pos           int
 	lastMatchPos  int
 }
 
-// username?id=34&ref=23/name
-func NewTagMatcher(size int, query string) TagMatcher {
-	path := make([]string, size)
+func NewTagMatcher(size int, queryString string) TagMatcher {
+	path := tagPath.NewTagPath()
 	last := make([]string, size)
-	split := strings.Split(query, "/")
-	return TagMatcher{pathQuery:split, path: path, lastMatchPath:last, pos:0, lastMatchPos:0}
+	q := queryParser.Parse(queryString)
+	return TagMatcher{query:q, path: path, lastMatchPath:last, lastMatchPos:0}
 }
 
-func (np *TagMatcher)GetPath() string {
-	return strings.Join(np.path[:np.pos], "/")
-}
 
-func (np *TagMatcher)GetLastMatchPath() string {
-	return strings.Join(np.lastMatchPath[:np.lastMatchPos], "/")
-}
-
-func (np *TagMatcher)Add(s string) {
-	np.path[np.pos] = s
-	np.pos++
+func (tm *TagMatcher)AddTag(tagText string) {
+	tag :=tagPath.NewTag()
+	elem := strings.Split(tagText," ")
+	tag.Name = elem[0]
+	if len(elem) > 1 {
+		for i := 1; i < len(elem);i++  {
+			attr := strings.Split(elem[i],"=")
+			tag.Add(tagPath.Attribute{Key:attr[0],Value:strings.Trim(attr[1],"\"'")})
+		}
+	}
+	tm.path.Add(tag)
 }
 
 func (np *TagMatcher)RemoveLast() {
-	np.pos = np.pos - 1
+	np.path.RemoveLast()
 }
 
-func (np *TagMatcher) TagNameMatchesLastMatch() bool {
-	if np.lastMatchPos == np.pos {
-		for i := 0; i < np.lastMatchPos; i++ {
-			if np.lastMatchPath[i] != np.path[i] {
+func (tm *TagMatcher) TagNameMatchesLastMatch() bool {
+	if tm.lastMatchPos == tm.path.PathPos {
+		for i := 0; i < tm.lastMatchPos; i++ {
+			if tm.lastMatchPath[i] != tm.path.Path[i].Name {
 				return false
 			}
 		}
@@ -49,17 +51,41 @@ func (np *TagMatcher) TagNameMatchesLastMatch() bool {
 	return true
 }
 
-func (np *TagMatcher) MatchesPath() bool {
-	pathQueryLength := len(np.pathQuery)
-	delta := np.pos - pathQueryLength
-	if np.pos >= pathQueryLength {
+func (tm *TagMatcher) MatchesPath() bool {
+	pathQueryLength := tm.query.PathPos
+	delta := tm.path.PathPos - pathQueryLength
+	var actualMatches int = 0
+	var expectedMatches int = 0
+	if tm.path.PathPos >= pathQueryLength {
 		for i := pathQueryLength - 1; i >= 0; i-- {
-			if np.pathQuery[i] != np.path[i + delta] {
+			fmt.Println(tm.query.Path[i].Name,tm.path.Path[i].Name)
+			if len(tm.query.Path[i].Name) != 0 && tm.query.Path[i].Name != tm.path.Path[i + delta].Name {
 				return false
 			}
+			queryAttr := tm.query.Path[i].Attributes
+			pathAttr := tm.path.Path[i].Attributes
+			expectedMatches = tm.query.Path[i].AttributePos
+			fmt.Println(tm.query.Path[i].Attributes[:tm.query.Path[i].AttributePos],tm.path.Path[i].Attributes[:tm.path.Path[i].AttributePos])
+			for j := 0; j > tm.query.Path[i].AttributePos; j++ {
+				for g := 0; g < tm.path.Path[j].AttributePos; g++ {
+					if queryAttr[j].Key == pathAttr[g].Key{
+						if len(queryAttr[j].Value) == 0 || queryAttr[j].Value == pathAttr[g].Value{
+							actualMatches++
+						}
+					}
+				}
+			}
+			fmt.Println(expectedMatches,actualMatches)
+			if expectedMatches != actualMatches{
+				return false
+			}
+			actualMatches = 0
+			expectedMatches = 0
 		}
-		np.lastMatchPos = np.pos
-		copy(np.lastMatchPath, np.path[:np.pos])
+		tm.lastMatchPos = tm.path.PathPos
+		for i := 0; i < tm.path.PathPos; i++ {
+			tm.lastMatchPath[i] = tm.path.Path[i].Name
+		}
 		return true
 	}else {
 		return false
