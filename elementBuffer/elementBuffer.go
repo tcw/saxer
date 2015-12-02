@@ -1,4 +1,5 @@
 package elementBuffer
+import "fmt"
 
 type ElementBuffer struct {
 	buffer     []byte
@@ -29,5 +30,6 @@ func (eb *ElementBuffer) Add(b []byte) {
 }
 
 func (eb *ElementBuffer) GetBuffer() []byte {
+	fmt.Println(eb.Position,string(eb.buffer))
 	return eb.buffer[:eb.Position]
 }

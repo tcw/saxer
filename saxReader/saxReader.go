@@ -4,7 +4,6 @@ import (
 	"io"
 	"github.com/tcw/saxer/histBuffer"
 	"github.com/tcw/saxer/contentBuffer"
-	"bytes"
 	"github.com/tcw/saxer/elementBuffer"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"fmt"
@@ -118,6 +117,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 
 func ElementType(nodeContent []byte, eb *elementBuffer.ElementBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher, isRecoding bool, isInnerXml bool) (bool, error) {
 	if nodeContent[1] == byte('/') {
+		fmt.Println("END")
 		if eb.StartTags == 0{
 			return isRecoding, errors.New("found end tag before start tag")
 		}
@@ -139,7 +139,7 @@ func ElementType(nodeContent []byte, eb *elementBuffer.ElementBuffer, contentBuf
 		matcher.RemoveLast()
 		return false, nil
 	}else if nodeContent[len(nodeContent) - 1] == byte('/') {
-		matcher.AddTag(getNodeName(nodeContent))
+		matcher.AddTag(string(nodeContent[1:]))
 		if matcher.MatchesPath() {
 			if !isRecoding {
 				contentBuffer.AddArray(nodeContent)
@@ -151,8 +151,8 @@ func ElementType(nodeContent []byte, eb *elementBuffer.ElementBuffer, contentBuf
 		matcher.RemoveLast()
 		return false, nil
 	}else {
-		nodename := getNodeName(nodeContent)
-		matcher.AddTag(nodename)
+		fmt.Println("START")
+		matcher.AddTag(string(nodeContent[1:]))
 		eb.StartTags++
 		if !isRecoding {
 			if matcher.MatchesPath() {
@@ -167,14 +167,5 @@ func ElementType(nodeContent []byte, eb *elementBuffer.ElementBuffer, contentBuf
 		}else {
 			return true, nil
 		}
-	}
-}
-
-func getNodeName(nodeContent []byte) string {
-	idx := bytes.IndexByte(nodeContent, byte(' '))
-	if idx == -1 {
-		return string(nodeContent[1:])
-	}else {
-		return string(nodeContent[1:idx])
 	}
 }
