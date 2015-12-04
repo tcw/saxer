@@ -3,7 +3,6 @@ import (
 	"strings"
 	"github.com/tcw/saxer/tagPath"
 	"github.com/tcw/saxer/queryParser"
-	"fmt"
 )
 
 type TagMatcher struct {
@@ -34,17 +33,57 @@ func NewTagMatcher(size int, queryString string) TagMatcher {
 
 
 func (tm *TagMatcher)AddTag(tagText string) {
-	fmt.Println("new Tag:", tagText)
-	tag := tagPath.NewTag()
-	elem := strings.Split(tagText, " ")
-	tag.Name = elem[0]
-	if len(elem) > 1 {
-		for i := 1; i < len(elem); i++ {
-			attr := strings.Split(elem[i], "=")
-			tag.Add(tagPath.Attribute{Key:attr[0], Value:strings.Trim(attr[1], "\"'")})
+	tagNameEnd := 0
+	attr := make([]int, 100)
+	attrPos := 0
+	insideAttrValue := false
+	insideAttrKey := false
+	readSpace := false
+	readEquals := false
+	var seperator rune = 0
+	noEnd := strings.TrimRight(tagText,"/")
+	trimmed := strings.TrimSpace(noEnd)
+	for key, value := range trimmed {
+		if value == rune(' ') && !insideAttrValue {
+			if tagNameEnd == 0 {
+				tagNameEnd = key
+			}
+			readSpace = true
+		}else if value == rune('=') && !insideAttrValue {
+			readEquals = true
+			attr[attrPos] = key
+			attrPos++
+		}else if readEquals && !insideAttrValue && (value == rune('\'') || value == rune('"')) {
+			seperator = value
+			insideAttrValue = true
+			insideAttrKey = false
+			readEquals = false
+			attr[attrPos] = key + 1
+			attrPos++
+		}else if readSpace && !insideAttrValue {
+			if !insideAttrKey {
+				attr[attrPos] = key
+				attrPos++
+			}
+			insideAttrKey = true
+		}else if value == seperator && insideAttrValue {
+			seperator = 0
+			insideAttrValue = false
+			attr[attrPos] = key
+			attrPos++
 		}
 	}
+	tag := tagPath.NewTag()
+	if attrPos == 0 {
+		tag.Name = strings.TrimSpace(tagText)
+	}else {
+		tag.Name = tagText[:tagNameEnd]
+	}
+	for i := 0; i < attrPos; i = i + 4 {
+		tag.Add(tagPath.Attribute{Key:strings.TrimSpace(tagText[attr[i]:attr[i + 1]]), Value:tagText[attr[i + 2]:attr[i + 3]]})
+	}
 	tm.path.Add(tag)
+
 }
 
 func (np *TagMatcher)RemoveLast() {
@@ -52,7 +91,6 @@ func (np *TagMatcher)RemoveLast() {
 }
 
 func (tm *TagMatcher) TagNameMatchesLastMatch() bool {
-	fmt.Println(tm.lastMatchPos,tm.path.PathPos)
 	if tm.lastMatchPos == tm.path.PathPos {
 		for i := 0; i < tm.lastMatchPos; i++ {
 			if tm.lastMatchPath[i] != tm.path.Path[i].Name {
@@ -66,24 +104,20 @@ func (tm *TagMatcher) TagNameMatchesLastMatch() bool {
 }
 
 func (tm *TagMatcher) MatchesPath() bool {
-	fmt.Println(tm.path.PathPos)
 	pathQueryLength := tm.query.PathPos
 	delta := tm.path.PathPos - pathQueryLength
 	var actualMatches int = 0
 	var expectedMatches int = 0
 	if tm.path.PathPos >= pathQueryLength && (tm.queryHasPath || tm.queryHasAttributes) {
 		for i := pathQueryLength - 1; i >= 0; i-- {
-			fmt.Println(tm.query.Path[i].Name, tm.path.Path[i].Name)
 			if len(tm.query.Path[i].Name) != 0 && tm.query.Path[i].Name != tm.path.Path[i + delta].Name {
 				return false
 			}
 			queryAttr := tm.query.Path[i].Attributes
 			pathAttr := tm.path.Path[i].Attributes
 			expectedMatches = tm.query.Path[i].AttributePos
-			fmt.Println(tm.query.Path[i].Attributes[:tm.query.Path[i].AttributePos], tm.path.Path[i].Attributes[:tm.path.Path[i].AttributePos])
 			for j := 0; j < tm.query.Path[i].AttributePos; j++ {
 				for g := 0; g < tm.path.Path[i].AttributePos; g++ {
-					fmt.Println(queryAttr[j].Key, pathAttr[g].Key)
 					if queryAttr[j].Key == pathAttr[g].Key {
 						if len(queryAttr[j].Value) == 0 || queryAttr[j].Value == pathAttr[g].Value {
 							actualMatches++
@@ -91,7 +125,6 @@ func (tm *TagMatcher) MatchesPath() bool {
 					}
 				}
 			}
-			fmt.Println(expectedMatches, actualMatches)
 			if expectedMatches != actualMatches {
 				return false
 			}

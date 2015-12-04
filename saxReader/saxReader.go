@@ -117,7 +117,6 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 
 func ElementType(nodeContent []byte, eb *elementBuffer.ElementBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher, isRecoding bool, isInnerXml bool) (bool, error) {
 	if nodeContent[1] == byte('/') {
-		fmt.Println("END")
 		if eb.StartTags == 0{
 			return isRecoding, errors.New("found end tag before start tag")
 		}
@@ -151,7 +150,6 @@ func ElementType(nodeContent []byte, eb *elementBuffer.ElementBuffer, contentBuf
 		matcher.RemoveLast()
 		return false, nil
 	}else {
-		fmt.Println("START")
 		matcher.AddTag(string(nodeContent[1:]))
 		eb.StartTags++
 		if !isRecoding {
