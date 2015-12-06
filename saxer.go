@@ -28,7 +28,7 @@ const ONE_KB  int = 1024
 const ONE_MB  int = ONE_KB * ONE_KB
 
 func main() {
-	kingpin.Version("0.0.3")
+	kingpin.Version("0.0.4")
 	kingpin.Parse()
 
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
