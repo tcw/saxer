@@ -20,7 +20,7 @@ var (
 	count = kingpin.Flag("count", "Number of matches (default false)").Short('n').Default("false").Bool()
 	contentBuffer = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Short('e').Default("4").Int()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Short('t').Default("4").Int()
-
+	firstN = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
 	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
 )
 
@@ -63,7 +63,10 @@ func main() {
 
 func emitterPrinter(emitter chan string) {
 	for {
-		fmt.Println(<-emitter)
+		message := <-emitter
+		if len(message) != 0{
+			fmt.Println(message)
+		}
 	}
 }
 
@@ -83,6 +86,28 @@ func SaxXmlInput(reader io.Reader) {
 		sr.EmitterFn = emitterCounter
 		err = sr.Read(reader, *query)
 		fmt.Println(counter)
+	}else if *firstN > 0 {
+		counter := 0
+		elemChan := make(chan string, 100)
+		go emitterPrinter(elemChan)
+		emitter := func(element string) bool{
+			elemChan <- element
+			counter++
+			if counter >= *firstN{
+				close(elemChan)
+				return true
+			}else {
+				return false
+			}
+		};
+
+		sr.EmitterFn = emitter
+		err = sr.Read(reader, *query)
+		for{
+			if len(elemChan) == 0{
+				break
+			}
+		}
 	}else {
 		elemChan := make(chan string, 100)
 		defer close(elemChan)
@@ -93,6 +118,11 @@ func SaxXmlInput(reader io.Reader) {
 		};
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, *query)
+		for{
+			if len(elemChan) == 0{
+				break
+			}
+		}
 	}
 	if err != nil {
 		panic(err)
