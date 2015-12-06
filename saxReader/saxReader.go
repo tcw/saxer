@@ -4,12 +4,11 @@ import (
 	"io"
 	"github.com/tcw/saxer/histBuffer"
 	"github.com/tcw/saxer/contentBuffer"
-	"github.com/tcw/saxer/nodePath"
-	"bytes"
+	"github.com/tcw/saxer/elementBuffer"
 	"github.com/syndtr/goleveldb/leveldb/errors"
 	"fmt"
 	"github.com/hashicorp/errwrap"
-	"github.com/tcw/saxer/tagBuffer"
+	"github.com/tcw/saxer/tagMatcher"
 )
 
 type SaxReader struct {
@@ -36,7 +35,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 	tb := tagBuffer.NewTagBuffer(sr.ElementBufferSize)
 	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
 	contentBuffer := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
-	nodePath := nodePath.NewNodePath(sr.PathDepthSize, query)
+	tagPath := tagMatcher.NewTagMatcher(sr.PathDepthSize,query)
 	buffer := make([]byte, sr.ReaderBufferSize)
 	inEscapeMode := false
 	isRecoding := false
@@ -91,16 +90,16 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 			if ((tb.LocalStart != -1 && index != 0 && tb.LocalStart == index - 1) && (value == byte('!') || value == byte('?'))) ||
 			(index == 0 && tb.Position == 1 && (value == byte('!') || value == byte('?'))) {
 				inEscapeMode = true
-				tb.ResetState()
-			}else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
-				isRecoding, err = ElementType(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuffer, &nodePath, isRecoding, sr.IsInnerXml)
+				eb.ResetState()
+			}else if eb.LocalStart != -1 && eb.LocalEnd != -1 && eb.Position == 0 {
+				isRecoding, err = ElementType(buffer[eb.LocalStart:eb.LocalEnd], &eb, &contentBuffer, &tagPath, isRecoding, sr.IsInnerXml)
 				if err != nil {
 					return errwrap.Wrapf(fmt.Sprintf("Error on line %d {{err}}", lineNumber+1), err)
 				}
-				tb.ResetLocalState()
-			}else if tb.LocalEnd != -1 {
-				tb.Add(buffer[:tb.LocalEnd])
-				isRecoding, err = ElementType(tb.GetBuffer(), &tb, &contentBuffer, &nodePath, isRecoding, sr.IsInnerXml)
+				eb.ResetLocalState()
+			}else if eb.LocalEnd != -1 {
+				eb.Add(buffer[:eb.LocalEnd])
+				isRecoding, err = ElementType(eb.GetBuffer(), &eb, &contentBuffer, &tagPath, isRecoding, sr.IsInnerXml)
 				if err != nil {
 					return errwrap.Wrapf(fmt.Sprintf("Error on line %d {{err}}", lineNumber+1), err)
 				}
@@ -116,31 +115,31 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 	return nil
 }
 
-func ElementType(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *contentBuffer.ContentBuffer, nodePath *nodePath.NodePath, isRecoding bool, isInnerXml bool) (bool, error) {
+func ElementType(nodeContent []byte, eb *elementBuffer.ElementBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher, isRecoding bool, isInnerXml bool) (bool, error) {
 	if nodeContent[1] == byte('/') {
 		if tb.StartTags == 0{
 			return isRecoding, errors.New("found end tag before start tag")
 		}
 		if isRecoding {
-			if nodePath.MatchesLastMatch() {
+			if matcher.TagNameMatchesLastMatch() {
 				if isInnerXml {
 					contentBuffer.Backup(len(nodeContent) + 1)
 				}
 				contentBuffer.Emit()
 				contentBuffer.Reset()
-				nodePath.RemoveLast()
+				matcher.RemoveLast()
 				return false, nil
 			}else {
-				nodePath.RemoveLast()
+				matcher.RemoveLast()
 				return true, nil
 			}
 		}
-		tb.StartTags--
-		nodePath.RemoveLast()
+		eb.StartTags--
+		matcher.RemoveLast()
 		return false, nil
 	}else if nodeContent[len(nodeContent) - 1] == byte('/') {
-		nodePath.Add(getNodeName(nodeContent))
-		if nodePath.MatchesPath() {
+		matcher.AddTag(string(nodeContent[1:]))
+		if matcher.MatchesPath() {
 			if !isRecoding {
 				contentBuffer.AddArray(nodeContent)
 				contentBuffer.Add(byte('>'))
@@ -148,14 +147,13 @@ func ElementType(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *con
 				contentBuffer.Reset()
 			}
 		}
-		nodePath.RemoveLast()
+		matcher.RemoveLast()
 		return false, nil
 	}else {
-		nodename := getNodeName(nodeContent)
-		nodePath.Add(nodename)
-		tb.StartTags++
+		matcher.AddTag(string(nodeContent[1:]))
+		eb.StartTags++
 		if !isRecoding {
-			if nodePath.MatchesPath() {
+			if matcher.MatchesPath() {
 				if !isInnerXml {
 					contentBuffer.AddArray(nodeContent)
 					contentBuffer.Add(byte('>'))
@@ -167,14 +165,5 @@ func ElementType(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *con
 		}else {
 			return true, nil
 		}
-	}
-}
-
-func getNodeName(nodeContent []byte) string {
-	idx := bytes.IndexByte(nodeContent, byte(' '))
-	if idx == -1 {
-		return string(nodeContent[1:])
-	}else {
-		return string(nodeContent[1:idx])
 	}
 }

@@ -9,7 +9,7 @@ import (
 
 
 func newTestSaxReader(emitterTestFn func(string)) SaxReader {
-	return SaxReader{ElementBufferSize:10,
+	return SaxReader{ElementBufferSize:100,
 		ContentBufferSize:1024,
 		ReaderBufferSize:10,
 		PathDepthSize:10,
@@ -180,4 +180,76 @@ func TestParseXmlOneNodeWithEndElementBeforeStartElementError(t *testing.T) {
 	err := saxReader.Read(reader, "hello")
 	fmt.Println(err)
 	assert.NotNil(t, err)
+}
+
+func TestParseXmlOneNodeOneAttributeDoubleQuote(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("<hello id=\"123\">test</hello>"))
+	saxReader := newTestSaxReader(emitter)
+	err := saxReader.Read(reader, "hello?id=123")
+	assert.Nil(t, err)
+	assert.Equal(t, res, "<hello id=\"123\">test</hello>")
+}
+
+func TestParseXmlOneNodeOneAttributeSingle(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("<hello id='123'>test</hello>"))
+	saxReader := newTestSaxReader(emitter)
+	err := saxReader.Read(reader, "hello?id=123")
+	assert.Nil(t, err)
+	assert.Equal(t, res, "<hello id='123'>test</hello>")
+}
+
+func TestParseXmlOneNodeTwoAttributes(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\">test</hello>"))
+	saxReader := newTestSaxReader(emitter)
+	err := saxReader.Read(reader, "hello?id=123&ref=42")
+	assert.Nil(t, err)
+	assert.Equal(t, res, "<hello id=\"123\" ref=\"42\">test</hello>")
+}
+
+func TestParseXmlOneNodeTwoAttributesNoMatch(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\">test</hello>"))
+	saxReader := newTestSaxReader(emitter)
+	err := saxReader.Read(reader, "hello?id=123&ref=421")
+	assert.Nil(t, err)
+	assert.NotEqual(t, res, "<hello id=\"123\" ref=\"42\">test</hello>")
+}
+
+func TestParseXmlTest(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\"><hello2 idx=\"1234\" refx=\"421\">test</hello2></hello>"))
+	saxReader := newTestSaxReader(emitter)
+	err := saxReader.Read(reader, "hello?id=123&ref=42/hello2?idx=1234&refx=421")
+	assert.Nil(t, err)
+	assert.Equal(t, res, "<hello2 idx=\"1234\" refx=\"421\">test</hello2>")
+}
+
+func TestParseXmlTestS(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("<hello><text xml:space=\"preserve\">this</text></hello>"))
+	saxReader := newTestSaxReader(emitter)
+	err := saxReader.Read(reader, "text?xml:space")
+	assert.Nil(t, err)
+	assert.Equal(t, res, "<text xml:space=\"preserve\">this</text>")
 }

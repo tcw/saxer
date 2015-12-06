@@ -11,6 +11,8 @@ import (
 	"io"
 	"bufio"
 	"strings"
+	"log"
+"runtime/pprof"
 )
 
 var (
@@ -21,7 +23,7 @@ var (
 	contentBuffer = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Short('e').Default("4").Int()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Short('t').Default("4").Int()
 
-//	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
+	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
 )
 
 const ONE_KB  int = 1024
@@ -34,15 +36,15 @@ func main() {
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
 	//evince callgraph.pdf
 
-	//	if *cpuProfile {
-	//		f, err := os.Create("cpu.pprof")
-	//		if err != nil {
-	//			log.Fatal(err)
-	//		}
-	//		pprof.StartCPUProfile(f)
-	//		fmt.Println("profiling!")
-	//		defer pprof.StopCPUProfile()
-	//	}
+		if *cpuProfile {
+			f, err := os.Create("cpu.pprof")
+			if err != nil {
+				log.Fatal(err)
+			}
+			pprof.StartCPUProfile(f)
+			fmt.Println("profiling!")
+			defer pprof.StopCPUProfile()
+		}
 
 	if strings.TrimSpace(*filename) != "" {
 		absFilename, err := abs(*filename)
