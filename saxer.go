@@ -11,6 +11,7 @@ import (
 	"strings"
 	"log"
 	"runtime/pprof"
+	"sync"
 )
 
 var (
@@ -20,7 +21,7 @@ var (
 	count = kingpin.Flag("count", "Number of matches (default false)").Short('n').Default("false").Bool()
 	contentBuffer = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Short('e').Default("4").Int()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Short('t').Default("4").Int()
-
+	firstN = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
 	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
 )
 
@@ -61,9 +62,10 @@ func main() {
 	}
 }
 
-func emitterPrinter(emitter chan string) {
+func emitterPrinter(emitter chan string, wg *sync.WaitGroup) {
 	for {
 		fmt.Println(<-emitter)
+		wg.Done()
 	}
 }
 
@@ -76,21 +78,42 @@ func SaxXmlInput(reader io.Reader) {
 	sr.ElementBufferSize = *tagBuffer * ONE_KB
 	if *count {
 		var counter uint64 = 0
-		emitterCounter := func(element string) {
+		emitterCounter := func(element string) bool {
 			counter++
+			return false
 		};
 		sr.EmitterFn = emitterCounter
 		err = sr.Read(reader, *query)
 		fmt.Println(counter)
-	}else {
+	}else if *firstN > 0 {
+		counter := 0
 		elemChan := make(chan string, 100)
-		defer close(elemChan)
-		go emitterPrinter(elemChan)
-		emitter := func(element string) {
+		var wg sync.WaitGroup
+		go emitterPrinter(elemChan, &wg)
+		emitter := func(element string) bool {
+			wg.Add(1)
 			elemChan <- element
+			counter++
+			if counter >= *firstN {
+				return true
+			}else {
+				return false
+			}
 		};
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, *query)
+		wg.Wait()
+	}else {
+		elemChan := make(chan string, 100)
+		var wg sync.WaitGroup
+		go emitterPrinter(elemChan, &wg)
+		emitter := func(element string) bool {
+			elemChan <- element
+			return false
+		};
+		sr.EmitterFn = emitter
+		err = sr.Read(reader, *query)
+		wg.Wait()
 	}
 	if err != nil {
 		panic(err)
