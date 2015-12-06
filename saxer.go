@@ -11,6 +11,7 @@ import (
 	"strings"
 	"log"
 	"runtime/pprof"
+	"sync"
 )
 
 var (
@@ -61,12 +62,10 @@ func main() {
 	}
 }
 
-func emitterPrinter(emitter chan string) {
+func emitterPrinter(emitter chan string, wg *sync.WaitGroup) {
 	for {
-		message := <-emitter
-		if len(message) != 0{
-			fmt.Println(message)
-		}
+		fmt.Println(<-emitter)
+		wg.Done()
 	}
 }
 
@@ -89,40 +88,32 @@ func SaxXmlInput(reader io.Reader) {
 	}else if *firstN > 0 {
 		counter := 0
 		elemChan := make(chan string, 100)
-		go emitterPrinter(elemChan)
-		emitter := func(element string) bool{
+		var wg sync.WaitGroup
+		go emitterPrinter(elemChan, &wg)
+		emitter := func(element string) bool {
+			wg.Add(1)
 			elemChan <- element
 			counter++
-			if counter >= *firstN{
-				close(elemChan)
+			if counter >= *firstN {
 				return true
 			}else {
 				return false
 			}
 		};
-
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, *query)
-		for{
-			if len(elemChan) == 0{
-				break
-			}
-		}
+		wg.Wait()
 	}else {
 		elemChan := make(chan string, 100)
-		defer close(elemChan)
-		go emitterPrinter(elemChan)
-		emitter := func(element string) bool{
+		var wg sync.WaitGroup
+		go emitterPrinter(elemChan, &wg)
+		emitter := func(element string) bool {
 			elemChan <- element
 			return false
 		};
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, *query)
-		for{
-			if len(elemChan) == 0{
-				break
-			}
-		}
+		wg.Wait()
 	}
 	if err != nil {
 		panic(err)
