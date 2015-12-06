@@ -5,14 +5,12 @@ import (
 	"os"
 	"path"
 	"gopkg.in/alecthomas/kingpin.v2"
-//	"log"
-//	"runtime/pprof"
 	"github.com/tcw/saxer/saxReader"
 	"io"
 	"bufio"
 	"strings"
 	"log"
-"runtime/pprof"
+	"runtime/pprof"
 )
 
 var (
@@ -36,15 +34,15 @@ func main() {
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
 	//evince callgraph.pdf
 
-		if *cpuProfile {
-			f, err := os.Create("cpu.pprof")
-			if err != nil {
-				log.Fatal(err)
-			}
-			pprof.StartCPUProfile(f)
-			fmt.Println("profiling!")
-			defer pprof.StopCPUProfile()
+	if *cpuProfile {
+		f, err := os.Create("cpu.pprof")
+		if err != nil {
+			log.Fatal(err)
 		}
+		pprof.StartCPUProfile(f)
+		fmt.Println("profiling!")
+		defer pprof.StopCPUProfile()
+	}
 
 	if strings.TrimSpace(*filename) != "" {
 		absFilename, err := abs(*filename)
