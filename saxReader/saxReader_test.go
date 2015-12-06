@@ -241,3 +241,15 @@ func TestParseXmlTest(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<hello2 idx=\"1234\" refx=\"421\">test</hello2>")
 }
+
+func TestParseXmlTestS(t *testing.T) {
+	res := ""
+	emitter := func(element string) {
+		res = element
+	};
+	reader := bytes.NewReader([]byte("<hello><text xml:space=\"preserve\">this</text></hello>"))
+	saxReader := newTestSaxReader(emitter)
+	err := saxReader.Read(reader, "text?xml:space")
+	assert.Nil(t, err)
+	assert.Equal(t, res, "<text xml:space=\"preserve\">this</text>")
+}

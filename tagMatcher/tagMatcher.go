@@ -85,7 +85,7 @@ func (tm *TagMatcher)AddTag(tagText string) {
 			tag.AddAttribute(strings.TrimSpace(tagText[attr[i]:attr[i + 1]]), tagText[attr[i + 2]:attr[i + 3]])
 		}
 	}else {
-		panic("Parser tag sttribute error")
+		panic("Parser tag attribute error")
 	}
 }
 
@@ -117,10 +117,10 @@ func (tm *TagMatcher) MatchesPath() bool {
 				return false
 			}
 			queryAttr := tm.query.Path[i].Attributes
-			pathAttr := tm.path.Path[i].Attributes
+			pathAttr := tm.path.Path[i+delta].Attributes
 			expectedMatches = tm.query.Path[i].AttributePos
 			for j := 0; j < tm.query.Path[i].AttributePos; j++ {
-				for g := 0; g < tm.path.Path[i].AttributePos; g++ {
+				for g := 0; g < tm.path.Path[i+delta].AttributePos; g++ {
 					if queryAttr[j].Key == pathAttr[g].Key {
 						if len(queryAttr[j].Value) == 0 || queryAttr[j].Value == pathAttr[g].Value {
 							actualMatches++
@@ -128,9 +128,10 @@ func (tm *TagMatcher) MatchesPath() bool {
 					}
 				}
 			}
-			if expectedMatches != actualMatches {
+				if expectedMatches != actualMatches {
 				return false
 			}
+
 			actualMatches = 0
 			expectedMatches = 0
 		}

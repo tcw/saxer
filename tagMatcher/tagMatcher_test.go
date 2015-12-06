@@ -22,3 +22,38 @@ func TestAddTagWithOnlyTagName(t *testing.T) {
 
 	assert.Equal(t,tm.path.Path[0].Name,"mediawiki")
 }
+
+
+func TestAddTagWithOnlyTagNameMatches(t *testing.T) {
+	tm :=NewTagMatcher(10,"mediawiki")
+	tm.AddTag("mediawiki")
+	assert.True(t,tm.MatchesPath())
+}
+
+func TestAddTagWithOnlyTwoTagNameMatches(t *testing.T) {
+	tm :=NewTagMatcher(10,"mediawiki")
+	tm.AddTag("hello")
+	tm.AddTag("mediawiki")
+	assert.True(t,tm.MatchesPath())
+}
+
+func TestAddTagWithSecondTagNameAttributeMatches(t *testing.T) {
+	tm :=NewTagMatcher(10,"text?xml:space=preserve")
+	tm.AddTag("hello")
+	tm.AddTag("text xml:space=\"preserve\"")
+	assert.True(t,tm.MatchesPath())
+}
+
+func TestAddTagWithSecondTagNameAttributeMatchesOnlyAttributeQuery(t *testing.T) {
+	tm :=NewTagMatcher(10,"?xml:space=preserve")
+	tm.AddTag("hello")
+	tm.AddTag("text xml:space=\"preserve\"")
+	assert.True(t,tm.MatchesPath())
+}
+
+func TestAddTagWithSecondTagNameAttributeMatchesOnlyAttributeKeyQuery(t *testing.T) {
+	tm :=NewTagMatcher(10,"?xml:space")
+	tm.AddTag("hello")
+	tm.AddTag("text xml:space=\"preserve\"")
+	assert.True(t,tm.MatchesPath())
+}
