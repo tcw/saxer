@@ -17,6 +17,8 @@ type Attribute struct {
 	Value string
 }
 
+
+//Construction structs up front and reusing them for performance gain
 func NewTagPath() *TagPath{
 	tp := &TagPath{make([]Tag, 100),0}
 	for i := 0; i < len(tp.Path); i++ {

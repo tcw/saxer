@@ -76,8 +76,9 @@ func SaxXmlInput(reader io.Reader) {
 	sr.ElementBufferSize = *tagBuffer * ONE_KB
 	if *count {
 		var counter uint64 = 0
-		emitterCounter := func(element string) {
+		emitterCounter := func(element string) bool {
 			counter++
+			return false
 		};
 		sr.EmitterFn = emitterCounter
 		err = sr.Read(reader, *query)
@@ -86,8 +87,9 @@ func SaxXmlInput(reader io.Reader) {
 		elemChan := make(chan string, 100)
 		defer close(elemChan)
 		go emitterPrinter(elemChan)
-		emitter := func(element string) {
+		emitter := func(element string) bool{
 			elemChan <- element
+			return false
 		};
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, *query)

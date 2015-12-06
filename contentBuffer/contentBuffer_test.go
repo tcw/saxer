@@ -7,8 +7,9 @@ import (
 
 var actual string = ""
 
-func emitterTestFn(element string) {
+func emitterTestFn(element string) bool{
 	actual = element
+	return false
 }
 
 func TestAdd(t *testing.T) {

@@ -41,7 +41,7 @@ func (tm *TagMatcher)AddTag(tagText string) {
 	insideAttrKey := false
 	readSpace := false
 	readEquals := false
-	var seperator rune = 0
+	var separator rune = 0
 	noEnd := strings.TrimRight(tagText,"/")
 	trimmed := strings.TrimSpace(noEnd)
 	for key, value := range trimmed {
@@ -55,7 +55,7 @@ func (tm *TagMatcher)AddTag(tagText string) {
 			attr[attrPos] = key
 			attrPos++
 		}else if readEquals && !insideAttrValue && (value == rune('\'') || value == rune('"')) {
-			seperator = value
+			separator = value
 			insideAttrValue = true
 			insideAttrKey = false
 			readEquals = false
@@ -67,8 +67,8 @@ func (tm *TagMatcher)AddTag(tagText string) {
 				attrPos++
 			}
 			insideAttrKey = true
-		}else if value == seperator && insideAttrValue {
-			seperator = 0
+		}else if value == separator && insideAttrValue {
+			separator = 0
 			insideAttrValue = false
 			attr[attrPos] = key
 			attrPos++
