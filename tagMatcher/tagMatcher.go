@@ -3,6 +3,7 @@ import (
 	"strings"
 	"github.com/tcw/saxer/tagPath"
 	"github.com/tcw/saxer/queryParser"
+	"github.com/google/gxui/math"
 )
 
 type TagMatcher struct {
@@ -28,7 +29,7 @@ func NewTagMatcher(size int, queryString string) TagMatcher {
 			qHasPath = true
 		}
 	}
-	return TagMatcher{query:q, queryHasAttributes:qHasAttributes, queryHasPath:qHasPath, path: path, lastMatchPath:last, lastMatchPos:0}
+	return TagMatcher{query:*q, queryHasAttributes:qHasAttributes, queryHasPath:qHasPath, path: *path, lastMatchPath:last, lastMatchPos:0}
 }
 
 
@@ -73,17 +74,19 @@ func (tm *TagMatcher)AddTag(tagText string) {
 			attrPos++
 		}
 	}
-	tag := tagPath.NewTag()
+	tag := tm.path.NextTag()
 	if attrPos == 0 {
 		tag.Name = strings.TrimSpace(tagText)
 	}else {
 		tag.Name = tagText[:tagNameEnd]
 	}
-	for i := 0; i < attrPos; i = i + 4 {
-		tag.Add(tagPath.Attribute{Key:strings.TrimSpace(tagText[attr[i]:attr[i + 1]]), Value:tagText[attr[i + 2]:attr[i + 3]]})
+	if math.Mod(attrPos,4) == 0{
+		for i := 0; i < attrPos; i = i + 4 {
+			tag.AddAttribute(strings.TrimSpace(tagText[attr[i]:attr[i + 1]]), tagText[attr[i + 2]:attr[i + 3]])
+		}
+	}else {
+		panic("Parser tag sttribute error")
 	}
-	tm.path.Add(tag)
-
 }
 
 func (np *TagMatcher)RemoveLast() {

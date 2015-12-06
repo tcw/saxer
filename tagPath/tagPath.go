@@ -17,24 +17,44 @@ type Attribute struct {
 	Value string
 }
 
-func NewTagPath() TagPath{
-	return TagPath{make([]Tag, 100),0}
+func NewTagPath() *TagPath{
+	tp := &TagPath{make([]Tag, 100),0}
+	for i := 0; i < len(tp.Path); i++ {
+		tp.Path[i] = newTag()
+		for j := 0; j < len(tp.Path[i].Attributes); j++ {
+			tp.Path[i].Attributes[j] = newAttribute()
+		}
+	}
+	return tp
 }
 
-func (tp *TagPath) Add(t Tag) {
-	tp.Path[tp.PathPos] = t
-	tp.PathPos++
-}
-
-func NewTag() Tag{
+func newTag() Tag{
 	return Tag{"", make([]Attribute, 100), 0}
 }
 
-func (t *Tag) Add(attr Attribute)  {
-	t.Attributes[t.AttributePos] = attr
+func newAttribute() Attribute{
+	return Attribute{"",""}
+}
+
+func (tp *TagPath) NextTag() *Tag{
+	tag := &tp.Path[tp.PathPos]
+	tp.PathPos++
+	return tag
+}
+
+func (tg *Tag) NextAttribute() *Attribute{
+	attr := &tg.Attributes[tg.AttributePos]
+	tg.AttributePos++
+	return attr
+}
+
+func (t *Tag) AddAttribute(key string,value string)  {
+	t.Attributes[t.AttributePos].Key = key
+	t.Attributes[t.AttributePos].Value = value
 	t.AttributePos++
 }
 
 func (t *TagPath) RemoveLast()  {
+	t.Path[t.PathPos].AttributePos = 0
 	t.PathPos--
 }

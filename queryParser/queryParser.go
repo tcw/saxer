@@ -5,20 +5,20 @@ import (
 	"github.com/tcw/saxer/tagPath"
 )
 
-func Parse(query string) tagPath.TagPath {
+func Parse(query string) *tagPath.TagPath {
 	split := strings.Split(query, "/")
 	path := tagPath.NewTagPath()
 	for _, value := range split {
 		tagText := strings.TrimSpace(value)
 		if len(tagText) != 0 {
-			path.Add(getTag(tagText))
+			addTag(tagText, path)
 		}
 	}
 	return path
 }
 
-func getTag(tagText string) tagPath.Tag{
-	tag := tagPath.NewTag()
+func addTag(tagText string, tp *tagPath.TagPath) {
+	tag := tp.NextTag()
 	if strings.Contains(tagText, "?") {
 		elem := strings.Split(tagText, "?")
 		if len(elem) != 0 {
@@ -29,24 +29,23 @@ func getTag(tagText string) tagPath.Tag{
 				if strings.Contains(elem[1], "&") {
 					attr := strings.Split(elem[1], "&")
 					for _, val := range attr {
-						tag.Add(getAttribute(val))
+						addToAttribute(val, tag)
 					}
 				}else {
-					tag.Add(getAttribute(elem[1]))
+					addToAttribute(elem[1], tag)
 				}
 			}
 		}
 	}else {
 		tag.Name = tagText
 	}
-	return tag
 }
 
-func getAttribute(attr string) tagPath.Attribute {
+func addToAttribute(attr string, tg *tagPath.Tag) {
 	if strings.Contains(attr, "=") {
 		attrKeyVal := strings.Split(attr, "=")
-		return tagPath.Attribute{attrKeyVal[0], attrKeyVal[1]}
+		tg.AddAttribute(attrKeyVal[0], attrKeyVal[1])
 	}else {
-		return tagPath.Attribute{attr, ""}
+		tg.AddAttribute(attr, "")
 	}
 }
