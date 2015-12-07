@@ -12,6 +12,7 @@ import (
 	"log"
 	"runtime/pprof"
 	"sync"
+	"github.com/tcw/saxer/htmlConverter"
 )
 
 var (
@@ -22,6 +23,7 @@ var (
 	contentBuffer = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Short('e').Default("4").Int()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Short('t').Default("4").Int()
 	firstN = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
+	unescape = kingpin.Flag("unescape", "Unescape html escape tokens (&lt; &gt; ...)").Short('u').Default("false").Bool()
 	cpuProfile = kingpin.Flag("profile", "Profile parser").Short('p').Bool()
 )
 
@@ -69,6 +71,23 @@ func emitterPrinter(emitter chan string, wg *sync.WaitGroup) {
 	}
 }
 
+func emitterPrinterConverter(emitter chan string, wg *sync.WaitGroup) {
+	hc := htmlConverter.NewHtmlConverter()
+	buffer := make([]rune, 100)
+	contentBuffer := make([]rune, *contentBuffer * ONE_MB)
+	contentPos := 0
+	for {
+		for _, value := range <-emitter {
+			n := hc.Translate(buffer, value)
+			copy(contentBuffer[contentPos:contentPos + n], buffer[:n])
+			contentPos = contentPos + n
+		}
+		fmt.Println(string(contentBuffer[:contentPos]))
+		contentPos = 0
+		wg.Done()
+	}
+}
+
 func SaxXmlInput(reader io.Reader) {
 	var err error
 	var sr saxReader.SaxReader
@@ -89,7 +108,11 @@ func SaxXmlInput(reader io.Reader) {
 		counter := 0
 		elemChan := make(chan string, 100)
 		var wg sync.WaitGroup
-		go emitterPrinter(elemChan, &wg)
+		if *unescape {
+			go emitterPrinterConverter(elemChan, &wg)
+		}else {
+			go emitterPrinter(elemChan, &wg)
+		}
 		emitter := func(element string) bool {
 			wg.Add(1)
 			elemChan <- element
@@ -106,7 +129,11 @@ func SaxXmlInput(reader io.Reader) {
 	}else {
 		elemChan := make(chan string, 100)
 		var wg sync.WaitGroup
-		go emitterPrinter(elemChan, &wg)
+		if *unescape {
+			go emitterPrinterConverter(elemChan, &wg)
+		}else {
+			go emitterPrinter(elemChan, &wg)
+		}
 		emitter := func(element string) bool {
 			wg.Add(1)
 			elemChan <- element

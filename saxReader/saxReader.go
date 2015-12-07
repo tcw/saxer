@@ -118,6 +118,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 	return nil
 }
 
+//todo: clean up!
 func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher, isRecoding bool, isInnerXml bool) (bool, bool, error) {
 	if nodeContent[1] == byte('/') {
 		if tb.StartTags == 0{
