@@ -23,7 +23,7 @@ func NewTagMatcher(size int, queryString string) TagMatcher {
 	q := queryParser.Parse(queryString)
 	qHasAttributes := false
 	qHasPath := false
-	tAttr := make([]int, 100)
+	tAttr := make([]int, 1024 * 4)
 	for i := 0; i < q.PathPos; i++ {
 		if q.Path[i].AttributePos > 0 {
 			qHasAttributes = true

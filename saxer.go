@@ -108,6 +108,7 @@ func SaxXmlInput(reader io.Reader) {
 		var wg sync.WaitGroup
 		go emitterPrinter(elemChan, &wg)
 		emitter := func(element string) bool {
+			wg.Add(1)
 			elemChan <- element
 			return false
 		};
