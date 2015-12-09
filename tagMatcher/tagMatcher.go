@@ -35,6 +35,10 @@ func NewTagMatcher(size int, queryString string) TagMatcher {
 	return TagMatcher{query:*q, queryHasAttributes:qHasAttributes, queryHasPath:qHasPath, path: *path, lastMatchPath:last, lastMatchPos:0, tmpAttr:tAttr, tmpAttrPos:0}
 }
 
+func (tm *TagMatcher)GetCurrentPath() string {
+	return tm.path.GetCurrentPath()
+}
+
 
 func (tm *TagMatcher)AddTag(tagText string) {
 	tagNameEnd := 0

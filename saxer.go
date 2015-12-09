@@ -21,6 +21,7 @@ var (
 	filename = kingpin.Arg("file", "xml-file").String()
 	isInnerXml = kingpin.Flag("inner", "Inner-xml of selected element (default false)").Short('i').Default("false").Bool()
 	count = kingpin.Flag("count", "Number of matches (default false)").Short('n').Default("false").Bool()
+	meta = kingpin.Flag("meta", "Get query meta data - linenumbers and path of matches (default false)").Short('m').Default("false").Bool()
 	contentBuf = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Short('e').Default("4").Int()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Short('t').Default("4").Int()
 	firstN = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
@@ -65,7 +66,15 @@ func main() {
 	}
 }
 
-func emitterPrinter(emitter chan string, wg *sync.WaitGroup) {
+func emitterMetaPrinter(emitter chan contentBuffer.EmitterData, wg *sync.WaitGroup) {
+	for {
+		ed := <-emitter
+		fmt.Printf("%d-%d    %s\n", ed.LineStart, ed.LineEnd, ed.NodePath)
+		wg.Done()
+	}
+}
+
+func emitterPrinter(emitter chan string, wg *sync.WaitGroup, ) {
 	for {
 		fmt.Println(<-emitter)
 		wg.Done()
@@ -105,7 +114,28 @@ func SaxXmlInput(reader io.Reader) {
 		sr.EmitterFn = emitterCounter
 		err = sr.Read(reader, *query)
 		fmt.Println(counter)
-	}else if *firstN > 0 {
+	}else if *meta {
+		counter := 0
+		elemChan := make(chan contentBuffer.EmitterData, 100)
+		var wg sync.WaitGroup
+		go emitterMetaPrinter(elemChan, &wg)
+		emitter := func(ed *contentBuffer.EmitterData) bool {
+			wg.Add(1)
+			elemChan <- contentBuffer.EmitterData{Content:ed.Content, LineStart:ed.LineStart, LineEnd:ed.LineEnd, NodePath:ed.NodePath}
+			if *firstN > 0{
+				counter++
+				if counter >= *firstN {
+					return true
+				}else {
+					return false
+				}
+			}
+			return false
+		};
+		sr.EmitterFn = emitter
+		err = sr.Read(reader, *query)
+		wg.Wait()
+	}else {
 		counter := 0
 		elemChan := make(chan string, 100)
 		var wg sync.WaitGroup
@@ -117,27 +147,14 @@ func SaxXmlInput(reader io.Reader) {
 		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
 			elemChan <- ed.Content
-			counter++
-			if counter >= *firstN {
-				return true
-			}else {
-				return false
+			if *firstN > 0{
+				counter++
+				if counter >= *firstN {
+					return true
+				}else {
+					return false
+				}
 			}
-		};
-		sr.EmitterFn = emitter
-		err = sr.Read(reader, *query)
-		wg.Wait()
-	}else {
-		elemChan := make(chan string, 100)
-		var wg sync.WaitGroup
-		if *unescape {
-			go emitterPrinterConverter(elemChan, &wg)
-		}else {
-			go emitterPrinter(elemChan, &wg)
-		}
-		emitter := func(ed *contentBuffer.EmitterData) bool {
-			wg.Add(1)
-			elemChan <- ed.Content
 			return false
 		};
 		sr.EmitterFn = emitter

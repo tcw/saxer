@@ -31,7 +31,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 	tb := tagBuffer.NewTagBuffer(sr.ElementBufferSize)
 	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
 	contentBuf := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
-	tagPath := tagMatcher.NewTagMatcher(sr.PathDepthSize,query)
+	tagPath := tagMatcher.NewTagMatcher(sr.PathDepthSize, query)
 	buffer := make([]byte, sr.ReaderBufferSize)
 	emitterData := &contentBuffer.EmitterData{}
 	inEscapeMode := false
@@ -90,22 +90,22 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 				inEscapeMode = true
 				tb.ResetState()
 			}else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
-				stop,isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, &tagPath,emitterData, isRecoding, sr.IsInnerXml)
-				if stop{
-					return nil
-				}
-				if err != nil {
-					return errwrap.Wrapf(fmt.Sprintf("Error on line %d {{err}}", lineNumber+1), err)
-				}
-				tb.ResetLocalState()
-			}else if tb.LocalEnd != -1 {
-				tb.Add(buffer[:tb.LocalEnd])
-				stop,isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, &tagPath, emitterData, isRecoding, sr.IsInnerXml)
+				stop, isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, &tagPath, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}
 				if err != nil {
-					return errwrap.Wrapf(fmt.Sprintf("Error on line %d {{err}}", lineNumber+1), err)
+					return errwrap.Wrapf(fmt.Sprintf("Error on line %d {{err}}", lineNumber + 1), err)
+				}
+				tb.ResetLocalState()
+			}else if tb.LocalEnd != -1 {
+				tb.Add(buffer[:tb.LocalEnd])
+				stop, isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, &tagPath, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
+				if stop {
+					return nil
+				}
+				if err != nil {
+					return errwrap.Wrapf(fmt.Sprintf("Error on line %d {{err}}", lineNumber + 1), err)
 				}
 				tb.ResetState()
 			}
@@ -120,9 +120,9 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 }
 
 //todo: clean up!
-func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher,emitterData *contentBuffer.EmitterData, isRecoding bool, isInnerXml bool) (bool, bool, error) {
+func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher, emitterData *contentBuffer.EmitterData, isRecoding bool, isInnerXml bool, lineNumber uint64) (bool, bool, error) {
 	if nodeContent[1] == byte('/') {
-		if tb.StartTags == 0{
+		if tb.StartTags == 0 {
 			return false, isRecoding, errors.New("found end tag before start tag")
 		}
 		if isRecoding {
@@ -130,38 +130,43 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 				if isInnerXml {
 					contentBuffer.Backup(len(nodeContent) + 1)
 				}
+				emitterData.NodePath = matcher.GetCurrentPath()
+				emitterData.LineEnd = lineNumber
 				stop := contentBuffer.Emit(emitterData)
 				emitterData.Reset()
-				if stop{
-					return true ,false, nil
+				if stop {
+					return true, false, nil
 				}
 				contentBuffer.Reset()
 				matcher.RemoveLast()
-				return false,false, nil
+				return false, false, nil
 			}else {
 				matcher.RemoveLast()
-				return false,true, nil
+				return false, true, nil
 			}
 		}
 		tb.StartTags--
 		matcher.RemoveLast()
 		return false, false, nil
 	}else if nodeContent[len(nodeContent) - 1] == byte('/') {
-		matcher.AddTag(string(nodeContent[1:]))
-		if matcher.MatchesPath() {
-			if !isRecoding {
+		if !isRecoding {
+			matcher.AddTag(string(nodeContent[1:]))
+			if matcher.MatchesPath() {
 				contentBuffer.AddArray(nodeContent)
 				contentBuffer.Add(byte('>'))
+				emitterData.NodePath = matcher.GetCurrentPath()
+				emitterData.LineStart = lineNumber
+				emitterData.LineEnd = lineNumber
 				stop := contentBuffer.Emit(emitterData)
 				emitterData.Reset()
-				if stop{
-					return true,false,nil
+				if stop {
+					return true, false, nil
 				}
 				contentBuffer.Reset()
 			}
+			matcher.RemoveLast()
 		}
-		matcher.RemoveLast()
-		return false,false, nil
+		return false, isRecoding, nil
 	}else {
 		matcher.AddTag(string(nodeContent[1:]))
 		tb.StartTags++
@@ -171,12 +176,13 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 					contentBuffer.AddArray(nodeContent)
 					contentBuffer.Add(byte('>'))
 				}
-				return false,true, nil
+				emitterData.LineStart = lineNumber + 1
+				return false, true, nil
 			}else {
-				return false,false, nil
+				return false, false, nil
 			}
 		}else {
-			return false,true, nil
+			return false, true, nil
 		}
 	}
 }
