@@ -7,8 +7,10 @@ import (
 
 var actual string = ""
 
-func emitterTestFn(element string,linenumber uint64, path string) bool{
-	actual = element
+var emitterData *EmitterData = &EmitterData{}
+
+func emitterTestFn(ed *EmitterData) bool{
+	actual = ed.Content
 	return false
 }
 
@@ -17,8 +19,9 @@ func TestAdd(t *testing.T) {
 	cb.Add(byte('a'))
 	cb.Add(byte('b'))
 	cb.Add(byte('c'))
-	cb.Emit(0,"")
+	cb.Emit(emitterData)
 	assert.Equal(t, actual, "abc")
+	emitterData.Reset()
 }
 
 func TestReset(t *testing.T) {
@@ -26,18 +29,18 @@ func TestReset(t *testing.T) {
 	cb.Add(byte('a'))
 	cb.Add(byte('b'))
 	cb.Add(byte('c'))
-	cb.Emit(0,"")
+	cb.Emit(emitterData)
 	assert.Equal(t, actual, "abc")
 	cb.Reset()
 	cb.Add(byte('d'))
-	cb.Emit(0,"")
+	cb.Emit(emitterData)
 	assert.Equal(t, actual, "d")
 }
 
 func TestAddArray(t *testing.T) {
 	cb := NewContentBuffer(1024, emitterTestFn)
 	cb.AddArray([]byte{'a', 'b', 'c'})
-	cb.Emit(0,"")
+	cb.Emit(emitterData)
 	assert.Equal(t, actual, "abc")
 }
 

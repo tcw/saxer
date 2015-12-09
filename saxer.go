@@ -13,6 +13,7 @@ import (
 	"runtime/pprof"
 	"sync"
 	"github.com/tcw/saxer/htmlConverter"
+	"github.com/tcw/saxer/contentBuffer"
 )
 
 var (
@@ -20,7 +21,7 @@ var (
 	filename = kingpin.Arg("file", "xml-file").String()
 	isInnerXml = kingpin.Flag("inner", "Inner-xml of selected element (default false)").Short('i').Default("false").Bool()
 	count = kingpin.Flag("count", "Number of matches (default false)").Short('n').Default("false").Bool()
-	contentBuffer = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Short('e').Default("4").Int()
+	contentBuf = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Short('e').Default("4").Int()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Short('t').Default("4").Int()
 	firstN = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
 	unescape = kingpin.Flag("unescape", "Unescape html escape tokens (&lt; &gt; ...)").Short('u').Default("false").Bool()
@@ -74,15 +75,15 @@ func emitterPrinter(emitter chan string, wg *sync.WaitGroup) {
 func emitterPrinterConverter(emitter chan string, wg *sync.WaitGroup) {
 	hc := htmlConverter.NewHtmlConverter()
 	buffer := make([]rune, 100)
-	contentBuffer := make([]rune, *contentBuffer * ONE_MB)
+	cb := make([]rune, *contentBuf * ONE_MB)
 	contentPos := 0
 	for {
 		for _, value := range <-emitter {
 			n := hc.Translate(buffer, value)
-			copy(contentBuffer[contentPos:contentPos + n], buffer[:n])
+			copy(cb[contentPos:contentPos + n], buffer[:n])
 			contentPos = contentPos + n
 		}
-		fmt.Println(string(contentBuffer[:contentPos]))
+		fmt.Println(string(cb[:contentPos]))
 		contentPos = 0
 		wg.Done()
 	}
@@ -93,11 +94,11 @@ func SaxXmlInput(reader io.Reader) {
 	var sr saxReader.SaxReader
 	sr = saxReader.NewSaxReaderNoEmitter()
 	sr.IsInnerXml = *isInnerXml
-	sr.ContentBufferSize = *contentBuffer * ONE_MB
+	sr.ContentBufferSize = *contentBuf * ONE_MB
 	sr.ElementBufferSize = *tagBuffer * ONE_KB
 	if *count {
 		var counter uint64 = 0
-		emitterCounter := func(element string,linenumber uint64,path string) bool {
+		emitterCounter := func(ed *contentBuffer.EmitterData) bool {
 			counter++
 			return false
 		};
@@ -113,9 +114,9 @@ func SaxXmlInput(reader io.Reader) {
 		}else {
 			go emitterPrinter(elemChan, &wg)
 		}
-		emitter := func(element string,linenumber uint64,path string) bool {
+		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
-			elemChan <- element
+			elemChan <- ed.Content
 			counter++
 			if counter >= *firstN {
 				return true
@@ -134,9 +135,9 @@ func SaxXmlInput(reader io.Reader) {
 		}else {
 			go emitterPrinter(elemChan, &wg)
 		}
-		emitter := func(element string,linenumber uint64,path string) bool {
+		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
-			elemChan <- element
+			elemChan <- ed.Content
 			return false
 		};
 		sr.EmitterFn = emitter

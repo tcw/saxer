@@ -1,12 +1,26 @@
 package contentBuffer
 
 type ContentBuffer struct {
-	buf       []byte
-	pos       int
-	emitterFn func(string,uint64,string) bool
+	buf           []byte
+	pos           int
+	emitterFn     func(*EmitterData) bool
 }
 
-func NewContentBuffer(size int, emitter func(string,uint64,string) bool) ContentBuffer {
+type EmitterData struct {
+	Content   string
+	LineStart uint64
+	LineEnd   uint64
+	NodePath  string
+}
+
+func (ed *EmitterData)Reset() {
+	ed.Content = ""
+	ed.LineStart = 0
+	ed.LineEnd = 0
+	ed.NodePath = ""
+}
+
+func NewContentBuffer(size int, emitter func(*EmitterData) bool) ContentBuffer {
 	i := make([]byte, size)
 	return ContentBuffer{buf: i, pos:0, emitterFn:emitter }
 }
@@ -29,8 +43,9 @@ func (cb *ContentBuffer)Backup(step int) {
 	cb.pos = cb.pos - step
 }
 
-func (cb *ContentBuffer) Emit(lineNumber uint64, path string) bool {
-	return cb.emitterFn(string(cb.buf[:cb.pos]), lineNumber, path)
+func (cb *ContentBuffer) Emit(ed *EmitterData) bool {
+	ed.Content = string(cb.buf[:cb.pos])
+	return cb.emitterFn(ed)
 }
 
 
