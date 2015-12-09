@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"github.com/zacg/testify/assert"
 	"fmt"
+	"github.com/tcw/saxer/contentBuffer"
 )
 
+var emitterData *contentBuffer.EmitterData = &contentBuffer.EmitterData{}
 
-func newTestSaxReader(emitterTestFn func(string) bool) SaxReader {
+func newTestSaxReader(emitterTestFn func(*contentBuffer.EmitterData) bool) SaxReader {
 	return SaxReader{ElementBufferSize:100,
 		ContentBufferSize:1024,
 		ReaderBufferSize:10,
@@ -20,8 +22,8 @@ func newTestSaxReader(emitterTestFn func(string) bool) SaxReader {
 
 func TestParseXmlOneNode(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello>test</hello>"))
@@ -33,8 +35,8 @@ func TestParseXmlOneNode(t *testing.T) {
 
 func TestParseXmlOneNodeEmptySearch(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello>test</hello>"))
@@ -46,8 +48,8 @@ func TestParseXmlOneNodeEmptySearch(t *testing.T) {
 
 func TestParseInnerXmlOneNode(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello>test</hello>"))
@@ -61,8 +63,8 @@ func TestParseInnerXmlOneNode(t *testing.T) {
 
 func TestParseXmlNodeConstrainedBuffer(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello>test</hello>"))
@@ -76,8 +78,8 @@ func TestParseXmlNodeConstrainedBuffer(t *testing.T) {
 func TestParseXmlNodesConstrainedBuffer(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
-		actuals[actualsPos] = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		actuals[actualsPos] = ed.Content
 		actualsPos++
 		return false
 	};
@@ -93,8 +95,8 @@ func TestParseXmlNodesConstrainedBuffer(t *testing.T) {
 func TestParseXmlNodesWithComments(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
-		actuals[actualsPos] = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		actuals[actualsPos] = ed.Content
 		actualsPos++
 		return false
 	};
@@ -110,8 +112,8 @@ func TestParseXmlNodesWithComments(t *testing.T) {
 func TestParseXmlNodesWithCdata(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
-		actuals[actualsPos] = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		actuals[actualsPos] = ed.Content
 		actualsPos++
 		return false
 	};
@@ -126,8 +128,8 @@ func TestParseXmlNodesWithCdata(t *testing.T) {
 func TestParseXmlNodesWithCdataAndComment(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
-		actuals[actualsPos] = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		actuals[actualsPos] = ed.Content
 		actualsPos++
 		return false
 	};
@@ -142,8 +144,8 @@ func TestParseXmlNodesWithCdataAndComment(t *testing.T) {
 func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
-		actuals[actualsPos] = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		actuals[actualsPos] = ed.Content
 		actualsPos++
 		return false
 	};
@@ -158,8 +160,8 @@ func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 
 func TestParseXmlNodesWithLtEscapeTag(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<helloA><helloB>&lt;helloC>&lt;/helloC></helloB></helloA>"))
@@ -171,8 +173,8 @@ func TestParseXmlNodesWithLtEscapeTag(t *testing.T) {
 
 func TestParseXmlOneNodeWithLtError(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<he<llo>test</hello>"))
@@ -181,10 +183,10 @@ func TestParseXmlOneNodeWithLtError(t *testing.T) {
 	assert.NotNil(t, err)
 }
 
-func TestParseXmlOneNodeWithEndElementBeforeStartElementError(t *testing.T) {
+func TestParseXmlOneNodeWithEndElementBeforeStartError(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("</hello>test</hello>"))
@@ -196,8 +198,8 @@ func TestParseXmlOneNodeWithEndElementBeforeStartElementError(t *testing.T) {
 
 func TestParseXmlOneNodeOneAttributeDoubleQuote(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello id=\"123\">test</hello>"))
@@ -209,8 +211,8 @@ func TestParseXmlOneNodeOneAttributeDoubleQuote(t *testing.T) {
 
 func TestParseXmlOneNodeOneAttributeSingle(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello id='123'>test</hello>"))
@@ -222,8 +224,8 @@ func TestParseXmlOneNodeOneAttributeSingle(t *testing.T) {
 
 func TestParseXmlOneNodeTwoAttributes(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\">test</hello>"))
@@ -235,8 +237,8 @@ func TestParseXmlOneNodeTwoAttributes(t *testing.T) {
 
 func TestParseXmlOneNodeTwoAttributesNoMatch(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\">test</hello>"))
@@ -248,8 +250,8 @@ func TestParseXmlOneNodeTwoAttributesNoMatch(t *testing.T) {
 
 func TestParseXmlTest(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\"><hello2 idx=\"1234\" refx=\"421\">test</hello2></hello>"))
@@ -261,8 +263,8 @@ func TestParseXmlTest(t *testing.T) {
 
 func TestParseXmlTestS(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello><text xml:space=\"preserve\">this</text></hello>"))
@@ -274,8 +276,8 @@ func TestParseXmlTestS(t *testing.T) {
 
 func TestParseXmlTestS2(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
-		res = element
+	emitter := func(ed *contentBuffer.EmitterData) bool {
+		res = ed.Content
 		return false
 	};
 	reader := bytes.NewReader([]byte("<hello><text xml:space=\"preserve\">this</text><hello2>Test2</hello2><hello3>Test3</hello3></hello>"))

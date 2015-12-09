@@ -1,4 +1,7 @@
 package tagPath
+import (
+	"bytes"
+)
 
 type TagPath struct {
 	Path    []Tag
@@ -16,6 +19,17 @@ type Attribute struct {
 	Value string
 }
 
+func (tp *TagPath) GetCurrentPath() string {
+	pathSlice := tp.Path[:tp.PathPos]
+	var buffer bytes.Buffer
+	for key, value := range pathSlice {
+		buffer.WriteString(value.Name)
+		if key != len(pathSlice) - 1 {
+			buffer.WriteString("/")
+		}
+	}
+	return buffer.String()
+}
 
 //Construction structs up front and reusing them for performance gain
 func NewTagPath() *TagPath {
