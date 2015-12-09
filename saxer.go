@@ -97,7 +97,7 @@ func SaxXmlInput(reader io.Reader) {
 	sr.ElementBufferSize = *tagBuffer * ONE_KB
 	if *count {
 		var counter uint64 = 0
-		emitterCounter := func(element string) bool {
+		emitterCounter := func(element string,linenumber uint64,path string) bool {
 			counter++
 			return false
 		};
@@ -113,7 +113,7 @@ func SaxXmlInput(reader io.Reader) {
 		}else {
 			go emitterPrinter(elemChan, &wg)
 		}
-		emitter := func(element string) bool {
+		emitter := func(element string,linenumber uint64,path string) bool {
 			wg.Add(1)
 			elemChan <- element
 			counter++
@@ -134,7 +134,7 @@ func SaxXmlInput(reader io.Reader) {
 		}else {
 			go emitterPrinter(elemChan, &wg)
 		}
-		emitter := func(element string) bool {
+		emitter := func(element string,linenumber uint64,path string) bool {
 			wg.Add(1)
 			elemChan <- element
 			return false

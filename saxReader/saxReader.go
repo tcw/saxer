@@ -16,7 +16,7 @@ type SaxReader struct {
 	ContentBufferSize int
 	ReaderBufferSize  int
 	PathDepthSize     int
-	EmitterFn         func(string) bool
+	EmitterFn         func(string,uint64,string) bool
 	IsInnerXml        bool
 }
 
@@ -129,7 +129,7 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 				if isInnerXml {
 					contentBuffer.Backup(len(nodeContent) + 1)
 				}
-				stop := contentBuffer.Emit()
+				stop := contentBuffer.Emit(0,"")
 				if stop{
 					return true ,false, nil
 				}
@@ -150,7 +150,7 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 			if !isRecoding {
 				contentBuffer.AddArray(nodeContent)
 				contentBuffer.Add(byte('>'))
-				stop := contentBuffer.Emit()
+				stop := contentBuffer.Emit(0,"")
 				if stop{
 					return true,false,nil
 				}

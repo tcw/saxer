@@ -8,7 +8,7 @@ import (
 )
 
 
-func newTestSaxReader(emitterTestFn func(string) bool) SaxReader {
+func newTestSaxReader(emitterTestFn func(string,uint64,string) bool) SaxReader {
 	return SaxReader{ElementBufferSize:100,
 		ContentBufferSize:1024,
 		ReaderBufferSize:10,
@@ -20,7 +20,7 @@ func newTestSaxReader(emitterTestFn func(string) bool) SaxReader {
 
 func TestParseXmlOneNode(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -33,7 +33,7 @@ func TestParseXmlOneNode(t *testing.T) {
 
 func TestParseXmlOneNodeEmptySearch(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -46,7 +46,7 @@ func TestParseXmlOneNodeEmptySearch(t *testing.T) {
 
 func TestParseInnerXmlOneNode(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -61,7 +61,7 @@ func TestParseInnerXmlOneNode(t *testing.T) {
 
 func TestParseXmlNodeConstrainedBuffer(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -76,7 +76,7 @@ func TestParseXmlNodeConstrainedBuffer(t *testing.T) {
 func TestParseXmlNodesConstrainedBuffer(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		actuals[actualsPos] = element
 		actualsPos++
 		return false
@@ -93,7 +93,7 @@ func TestParseXmlNodesConstrainedBuffer(t *testing.T) {
 func TestParseXmlNodesWithComments(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		actuals[actualsPos] = element
 		actualsPos++
 		return false
@@ -110,7 +110,7 @@ func TestParseXmlNodesWithComments(t *testing.T) {
 func TestParseXmlNodesWithCdata(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		actuals[actualsPos] = element
 		actualsPos++
 		return false
@@ -126,7 +126,7 @@ func TestParseXmlNodesWithCdata(t *testing.T) {
 func TestParseXmlNodesWithCdataAndComment(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		actuals[actualsPos] = element
 		actualsPos++
 		return false
@@ -142,7 +142,7 @@ func TestParseXmlNodesWithCdataAndComment(t *testing.T) {
 func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		actuals[actualsPos] = element
 		actualsPos++
 		return false
@@ -158,7 +158,7 @@ func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 
 func TestParseXmlNodesWithLtEscapeTag(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -171,7 +171,7 @@ func TestParseXmlNodesWithLtEscapeTag(t *testing.T) {
 
 func TestParseXmlOneNodeWithLtError(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -183,7 +183,7 @@ func TestParseXmlOneNodeWithLtError(t *testing.T) {
 
 func TestParseXmlOneNodeWithEndElementBeforeStartElementError(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -196,7 +196,7 @@ func TestParseXmlOneNodeWithEndElementBeforeStartElementError(t *testing.T) {
 
 func TestParseXmlOneNodeOneAttributeDoubleQuote(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -209,7 +209,7 @@ func TestParseXmlOneNodeOneAttributeDoubleQuote(t *testing.T) {
 
 func TestParseXmlOneNodeOneAttributeSingle(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -222,7 +222,7 @@ func TestParseXmlOneNodeOneAttributeSingle(t *testing.T) {
 
 func TestParseXmlOneNodeTwoAttributes(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -235,7 +235,7 @@ func TestParseXmlOneNodeTwoAttributes(t *testing.T) {
 
 func TestParseXmlOneNodeTwoAttributesNoMatch(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -248,7 +248,7 @@ func TestParseXmlOneNodeTwoAttributesNoMatch(t *testing.T) {
 
 func TestParseXmlTest(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -261,7 +261,7 @@ func TestParseXmlTest(t *testing.T) {
 
 func TestParseXmlTestS(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
@@ -274,7 +274,7 @@ func TestParseXmlTestS(t *testing.T) {
 
 func TestParseXmlTestS2(t *testing.T) {
 	res := ""
-	emitter := func(element string) bool {
+	emitter := func(element string,linenumber uint64,path string) bool {
 		res = element
 		return false
 	};
