@@ -15,7 +15,26 @@ type TagMatcher struct {
 	lastMatchPos       int
 	tmpAttr            []int
 	tmpAttrPos         int
+	equalityFn         func(string, string) bool
+	withoutNamespace   bool
 }
+
+var eqFnEqulas = func(query string, source string) bool {
+	return query == source
+}
+
+var eqFnEqulasCaseInsensitive = func(query string, source string) bool {
+	return query == source
+}
+
+var eqFnContains = func(query string, source string) bool {
+	return strings.Contains(source, query)
+}
+
+var eqFnContainsInsensitive = func(query string, source string) bool {
+	return strings.Contains(source, query)
+}
+
 
 func NewTagMatcher(size int, queryString string) TagMatcher {
 	path := tagPath.NewTagPath()
@@ -32,7 +51,16 @@ func NewTagMatcher(size int, queryString string) TagMatcher {
 			qHasPath = true
 		}
 	}
-	return TagMatcher{query:*q, queryHasAttributes:qHasAttributes, queryHasPath:qHasPath, path: *path, lastMatchPath:last, lastMatchPos:0, tmpAttr:tAttr, tmpAttrPos:0}
+
+	return TagMatcher{query:*q, queryHasAttributes:qHasAttributes,
+		queryHasPath:qHasPath,
+		path: *path,
+		lastMatchPath:last,
+		lastMatchPos:0,
+		tmpAttr:tAttr,
+		tmpAttrPos:0,
+		equalityFn:eqFnEqulasCaseInsensitive,
+		withoutNamespace:true}
 }
 
 func (tm *TagMatcher)GetCurrentPath() string {
@@ -119,16 +147,29 @@ func (tm *TagMatcher) MatchesPath() bool {
 	var expectedMatches int = 0
 	if tm.path.PathPos >= pathQueryLength && (tm.queryHasPath || tm.queryHasAttributes) {
 		for i := pathQueryLength - 1; i >= 0; i-- {
-			if len(tm.query.Path[i].Name) != 0 && tm.query.Path[i].Name != tm.path.Path[i + delta].Name {
-				return false
+			if len(tm.query.Path[i].Name) != 0 {
+				if tm.withoutNamespace {
+					tagName := tm.path.Path[i + delta].Name
+					tagNameParts := strings.Split(tagName, ":")
+					if len(tagNameParts) > 1 {
+						tagName = tagNameParts[1]
+					}
+					if !tm.equalityFn(tm.query.Path[i].Name, tagName) {
+						return false
+					}
+				}else {
+					if !tm.equalityFn(tm.query.Path[i].Name, tm.path.Path[i + delta].Name) {
+						return false
+					}
+				}
 			}
 			queryAttr := tm.query.Path[i].Attributes
 			pathAttr := tm.path.Path[i + delta].Attributes
 			expectedMatches = tm.query.Path[i].AttributePos
-			for j := 0; j < tm.query.Path[i].AttributePos; j++ {
+			for j := 0; j < tm.query.Path[i].AttributePos; j++ { // O(n^2) now, could be (n(n − 1)/2 ∈ Θ(n^2))
 				for g := 0; g < tm.path.Path[i + delta].AttributePos; g++ {
 					if queryAttr[j].Key == pathAttr[g].Key {
-						if len(queryAttr[j].Value) == 0 || queryAttr[j].Value == pathAttr[g].Value {
+						if len(queryAttr[j].Value) == 0 || tm.equalityFn(queryAttr[j].Value, pathAttr[g].Value) {
 							actualMatches++
 						}
 					}

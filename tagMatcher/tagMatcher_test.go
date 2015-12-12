@@ -23,7 +23,6 @@ func TestAddTagWithOnlyTagName(t *testing.T) {
 	assert.Equal(t,tm.path.Path[0].Name,"mediawiki")
 }
 
-
 func TestAddTagWithOnlyTagNameMatches(t *testing.T) {
 	tm :=NewTagMatcher(10,"mediawiki")
 	tm.AddTag("mediawiki")
