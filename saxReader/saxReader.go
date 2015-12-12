@@ -16,6 +16,7 @@ type SaxReader struct {
 	ContentBufferSize int
 	ReaderBufferSize  int
 	PathDepthSize     int
+	TagMatch 		  tagMatcher.TagMatcher
 	EmitterFn         func(*contentBuffer.EmitterData) bool
 	IsInnerXml        bool
 }
@@ -24,14 +25,20 @@ const ONE_KB  int = 1024
 const ONE_MB  int = ONE_KB * ONE_KB
 
 func NewSaxReaderNoEmitter() SaxReader {
-	return SaxReader{ONE_KB * 4, ONE_MB * 4, ONE_KB * 4, 1000, nil, false}
+
+	return SaxReader{ElementBufferSize:ONE_KB * 4,
+		ContentBufferSize:ONE_MB * 4,
+		ReaderBufferSize:ONE_KB * 4,
+		PathDepthSize:1000,
+		EmitterFn:nil,
+		IsInnerXml:false}
 }
 
 func (sr *SaxReader) Read(reader io.Reader, query string) error {
 	tb := tagBuffer.NewTagBuffer(sr.ElementBufferSize)
 	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
 	contentBuf := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
-	tagMatcher := tagMatcher.NewTagMatcher(sr.PathDepthSize, query)
+	sr.TagMatch = tagMatcher.NewTagMatcher(query)
 	buffer := make([]byte, sr.ReaderBufferSize)
 	emitterData := &contentBuffer.EmitterData{}
 	inEscapeMode := false
@@ -90,7 +97,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 				inEscapeMode = true
 				tb.ResetState()
 			}else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
-				stop, isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, &tagMatcher, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
+				stop, isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, &sr.TagMatch, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}
@@ -100,7 +107,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 				tb.ResetLocalState()
 			}else if tb.LocalEnd != -1 {
 				tb.Add(buffer[:tb.LocalEnd])
-				stop, isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, &tagMatcher, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
+				stop, isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, &sr.TagMatch, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}

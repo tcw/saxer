@@ -14,6 +14,7 @@ import (
 	"sync"
 	"github.com/tcw/saxer/htmlConverter"
 	"github.com/tcw/saxer/contentBuffer"
+	"github.com/tcw/saxer/tagMatcher"
 )
 
 var (
@@ -102,6 +103,9 @@ func SaxXmlInput(reader io.Reader) {
 	var err error
 	var sr saxReader.SaxReader
 	sr = saxReader.NewSaxReaderNoEmitter()
+	sr.TagMatch.EqualityFn = tagMatcher.EqFnEqulas
+	sr.TagMatch.CaseSensitive = true
+	sr.TagMatch.WithoutNamespace = true
 	sr.IsInnerXml = *isInnerXml
 	sr.ContentBufferSize = *contentBuf * ONE_MB
 	sr.ElementBufferSize = *tagBuffer * ONE_KB

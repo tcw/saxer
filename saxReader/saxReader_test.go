@@ -11,6 +11,7 @@ import (
 var emitterData *contentBuffer.EmitterData = &contentBuffer.EmitterData{}
 
 func newTestSaxReader(emitterTestFn func(*contentBuffer.EmitterData) bool) SaxReader {
+
 	return SaxReader{ElementBufferSize:100,
 		ContentBufferSize:1024,
 		ReaderBufferSize:10,
