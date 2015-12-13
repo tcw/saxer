@@ -173,9 +173,9 @@ func (tm *TagMatcher) MatchesPath() bool {
 			}
 
 			expectedMatches = tm.query.Path[i].AttributePos
-			for j := 0; j < tm.query.Path[i].AttributePos; j++ { //TODO O(n^2) now, could be (n(n − 1)/2)
+			for j := 0; j < tm.query.Path[i].AttributePos; j++ { //TODO n^2 now, could be (n(n − 1)/2)
 				for g := 0; g < tm.path.Path[i + delta].AttributePos; g++ {
-					if queryAttr[j].Key == pathAttr[g].Key {
+					if tm.EqualityFn(queryAttr[j].Key, pathAttr[g].Key) {
 						if len(queryAttr[j].Value) == 0 || tm.EqualityFn(queryAttr[j].Value, pathAttr[g].Value) {
 							actualMatches++
 						}

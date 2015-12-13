@@ -16,7 +16,6 @@ type SaxReader struct {
 	ContentBufferSize int
 	ReaderBufferSize  int
 	PathDepthSize     int
-	TagMatch 		  tagMatcher.TagMatcher
 	EmitterFn         func(*contentBuffer.EmitterData) bool
 	IsInnerXml        bool
 }
@@ -34,11 +33,10 @@ func NewSaxReaderNoEmitter() SaxReader {
 		IsInnerXml:false}
 }
 
-func (sr *SaxReader) Read(reader io.Reader, query string) error {
+func (sr *SaxReader) Read(reader io.Reader,tm *tagMatcher.TagMatcher) error {
 	tb := tagBuffer.NewTagBuffer(sr.ElementBufferSize)
 	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
 	contentBuf := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
-	sr.TagMatch = tagMatcher.NewTagMatcher(query)
 	buffer := make([]byte, sr.ReaderBufferSize)
 	emitterData := &contentBuffer.EmitterData{}
 	inEscapeMode := false
@@ -97,7 +95,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 				inEscapeMode = true
 				tb.ResetState()
 			}else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
-				stop, isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, &sr.TagMatch, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
+				stop, isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, tm, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}
@@ -107,7 +105,7 @@ func (sr *SaxReader) Read(reader io.Reader, query string) error {
 				tb.ResetLocalState()
 			}else if tb.LocalEnd != -1 {
 				tb.Add(buffer[:tb.LocalEnd])
-				stop, isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, &sr.TagMatch, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
+				stop, isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, tm, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}

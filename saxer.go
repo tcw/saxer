@@ -106,13 +106,14 @@ func SaxXmlInput(reader io.Reader) {
 	var err error
 	var sr saxReader.SaxReader
 	sr = saxReader.NewSaxReaderNoEmitter()
-	if *containMatch{
-		sr.TagMatch.EqualityFn = tagMatcher.EqFnContains
-	}else{
-		sr.TagMatch.EqualityFn = tagMatcher.EqFnEqulas
+	tm := tagMatcher.NewTagMatcher(*query)
+	if *containMatch {
+		tm.EqualityFn = tagMatcher.EqFnContains
+	}else {
+		tm.EqualityFn = tagMatcher.EqFnEqulas
 	}
-	sr.TagMatch.CaseSensitive = !*caseSesitive
-	sr.TagMatch.WithoutNamespace = *omitNamespace
+	tm.CaseSensitive = !*caseSesitive
+	tm.WithoutNamespace = *omitNamespace
 	sr.IsInnerXml = *isInnerXml
 	sr.ContentBufferSize = *contentBuf * ONE_MB
 	sr.ElementBufferSize = *tagBuffer * ONE_KB
@@ -123,7 +124,7 @@ func SaxXmlInput(reader io.Reader) {
 			return false
 		};
 		sr.EmitterFn = emitterCounter
-		err = sr.Read(reader, *query)
+		err = sr.Read(reader,&tm)
 		fmt.Println(counter)
 	}else if *meta {
 		counter := 0
@@ -144,7 +145,7 @@ func SaxXmlInput(reader io.Reader) {
 			return false
 		};
 		sr.EmitterFn = emitter
-		err = sr.Read(reader, *query)
+		err = sr.Read(reader,&tm)
 		wg.Wait()
 	}else {
 		counter := 0
@@ -169,7 +170,7 @@ func SaxXmlInput(reader io.Reader) {
 			return false
 		};
 		sr.EmitterFn = emitter
-		err = sr.Read(reader, *query)
+		err = sr.Read(reader,&tm)
 		wg.Wait()
 	}
 	if err != nil {
