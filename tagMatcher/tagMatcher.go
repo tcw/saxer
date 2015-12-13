@@ -15,11 +15,22 @@ type TagMatcher struct {
 	lastMatchPos       int
 	tmpAttr            []int
 	tmpAttrPos         int
+	EqualityFn         func(string, string) bool
+	CaseSensitive      bool
+	WithoutNamespace   bool
 }
 
-func NewTagMatcher(size int, queryString string) TagMatcher {
+var EqFnEqulas = func(query string, source string) bool {
+	return query == source
+}
+
+var EqFnContains = func(query string, source string) bool {
+	return strings.Contains(source, query)
+}
+
+func NewTagMatcher(queryString string) TagMatcher {
 	path := tagPath.NewTagPath()
-	last := make([]string, size)
+	last := make([]string, 1000)
 	q := queryParser.Parse(queryString)
 	qHasAttributes := false
 	qHasPath := false
@@ -32,7 +43,17 @@ func NewTagMatcher(size int, queryString string) TagMatcher {
 			qHasPath = true
 		}
 	}
-	return TagMatcher{query:*q, queryHasAttributes:qHasAttributes, queryHasPath:qHasPath, path: *path, lastMatchPath:last, lastMatchPos:0, tmpAttr:tAttr, tmpAttrPos:0}
+
+	return TagMatcher{query:*q, queryHasAttributes:qHasAttributes,
+		queryHasPath:qHasPath,
+		path: *path,
+		lastMatchPath:last,
+		lastMatchPos:0,
+		tmpAttr:tAttr,
+		tmpAttrPos:0,
+		EqualityFn:EqFnEqulas,
+		CaseSensitive:true,
+		WithoutNamespace:false}
 }
 
 func (tm *TagMatcher)GetCurrentPath() string {
@@ -119,16 +140,43 @@ func (tm *TagMatcher) MatchesPath() bool {
 	var expectedMatches int = 0
 	if tm.path.PathPos >= pathQueryLength && (tm.queryHasPath || tm.queryHasAttributes) {
 		for i := pathQueryLength - 1; i >= 0; i-- {
-			if len(tm.query.Path[i].Name) != 0 && tm.query.Path[i].Name != tm.path.Path[i + delta].Name {
-				return false
+			if len(tm.query.Path[i].Name) != 0 {
+				var queryTagName string
+				var pathTagName string
+				if tm.CaseSensitive {
+					queryTagName = tm.query.Path[i].Name // TODO Could be done once at init
+					pathTagName = tm.path.Path[i + delta].Name
+				}else {
+					queryTagName = strings.ToLower(tm.query.Path[i].Name) // TODO Could be done once at init
+					pathTagName = strings.ToLower(tm.path.Path[i + delta].Name)
+				}
+				if tm.WithoutNamespace {
+					tagNameParts := strings.Split(pathTagName, ":")
+					if len(tagNameParts) > 1 {
+						pathTagName = tagNameParts[1]
+					}
+					if !tm.EqualityFn(queryTagName, pathTagName) {
+						return false
+					}
+				}else {
+					if !tm.EqualityFn(queryTagName, pathTagName) {
+						return false
+					}
+				}
 			}
+
 			queryAttr := tm.query.Path[i].Attributes
 			pathAttr := tm.path.Path[i + delta].Attributes
+			if !tm.CaseSensitive {
+				toLowerCaseInPlace(queryAttr)
+				toLowerCaseInPlace(pathAttr)
+			}
+
 			expectedMatches = tm.query.Path[i].AttributePos
-			for j := 0; j < tm.query.Path[i].AttributePos; j++ {
+			for j := 0; j < tm.query.Path[i].AttributePos; j++ { //TODO n^2 now, could be (n(n − 1)/2)
 				for g := 0; g < tm.path.Path[i + delta].AttributePos; g++ {
-					if queryAttr[j].Key == pathAttr[g].Key {
-						if len(queryAttr[j].Value) == 0 || queryAttr[j].Value == pathAttr[g].Value {
+					if tm.EqualityFn(queryAttr[j].Key, pathAttr[g].Key) {
+						if len(queryAttr[j].Value) == 0 || tm.EqualityFn(queryAttr[j].Value, pathAttr[g].Value) {
 							actualMatches++
 						}
 					}
@@ -149,6 +197,14 @@ func (tm *TagMatcher) MatchesPath() bool {
 	}else {
 		return false
 	}
+}
+
+func toLowerCaseInPlace(elems []tagPath.Attribute) {
+	for i := 0; i < len(elems); i++ {
+		elems[i].Key = strings.ToLower(elems[i].Key)
+		elems[i].Value = strings.ToLower(elems[i].Value)
+	}
+
 }
 
 
