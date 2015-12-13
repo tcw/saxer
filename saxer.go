@@ -28,6 +28,7 @@ var (
 	caseSesitive = kingpin.Flag("case-sens", "Case sensitive tag-name and attribute matches (default true)").Short('s').Default("false").Bool()
 	omitNamespace = kingpin.Flag("omit-ns", "Omit namespace in tag-name matches").Short('o').Default("false").Bool()
 	containMatch = kingpin.Flag("contains", "Maching of tag-name and attributes is executed by contains (not equals)").Short('c').Default("false").Bool()
+	wrapResult = kingpin.Flag("wrap", "Wrap result in Xml tag").Short('w').Default("false").Bool()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Default("4").Int()
 	contentBuf = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Default("4").Int()
 	cpuProfile = kingpin.Flag("profile-cpu", "Profile parser").Bool()
@@ -117,6 +118,9 @@ func SaxXmlInput(reader io.Reader) {
 	sr.IsInnerXml = *isInnerXml
 	sr.ContentBufferSize = *contentBuf * ONE_MB
 	sr.ElementBufferSize = *tagBuffer * ONE_KB
+	if *wrapResult{
+		fmt.Println("<saxer-result>")
+	}
 	if *count {
 		var counter uint64 = 0
 		emitterCounter := func(ed *contentBuffer.EmitterData) bool {
@@ -124,7 +128,7 @@ func SaxXmlInput(reader io.Reader) {
 			return false
 		};
 		sr.EmitterFn = emitterCounter
-		err = sr.Read(reader,&tm)
+		err = sr.Read(reader, &tm)
 		fmt.Println(counter)
 	}else if *meta {
 		counter := 0
@@ -145,7 +149,7 @@ func SaxXmlInput(reader io.Reader) {
 			return false
 		};
 		sr.EmitterFn = emitter
-		err = sr.Read(reader,&tm)
+		err = sr.Read(reader, &tm)
 		wg.Wait()
 	}else {
 		counter := 0
@@ -170,8 +174,11 @@ func SaxXmlInput(reader io.Reader) {
 			return false
 		};
 		sr.EmitterFn = emitter
-		err = sr.Read(reader,&tm)
+		err = sr.Read(reader, &tm)
 		wg.Wait()
+	}
+	if *wrapResult{
+		fmt.Println("</saxer-result>")
 	}
 	if err != nil {
 		panic(err)
