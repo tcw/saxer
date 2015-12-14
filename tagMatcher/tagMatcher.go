@@ -69,8 +69,11 @@ func (tm *TagMatcher)AddTag(tagText string) {
 	readEquals := false
 	tm.tmpAttrPos = 0
 	var separator rune = 0
-	noEnd := strings.TrimRight(tagText, "/")
-	trimmed := strings.TrimSpace(noEnd)
+	cleanedTag := tagText
+	if strings.HasSuffix(tagText,"/"){
+		cleanedTag = strings.TrimRight(tagText, "/")
+	}
+	trimmed := strings.TrimSpace(cleanedTag)
 	for key, value := range trimmed {
 		if value == rune(' ') && !insideAttrValue {
 			if tagNameEnd == 0 {

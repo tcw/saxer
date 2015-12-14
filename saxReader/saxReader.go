@@ -33,7 +33,7 @@ func NewSaxReaderNoEmitter() SaxReader {
 		IsInnerXml:false}
 }
 
-func (sr *SaxReader) Read(reader io.Reader,tm *tagMatcher.TagMatcher) error {
+func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 	tb := tagBuffer.NewTagBuffer(sr.ElementBufferSize)
 	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
 	contentBuf := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
@@ -136,7 +136,7 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 					contentBuffer.Backup(len(nodeContent) + 1)
 				}
 				emitterData.NodePath = matcher.GetCurrentPath()
-				emitterData.LineEnd = lineNumber
+				emitterData.LineEnd = lineNumber + 1
 				stop := contentBuffer.Emit(emitterData)
 				emitterData.Reset()
 				if stop {
@@ -160,8 +160,8 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 				contentBuffer.AddArray(nodeContent)
 				contentBuffer.Add(byte('>'))
 				emitterData.NodePath = matcher.GetCurrentPath()
-				emitterData.LineStart = lineNumber
-				emitterData.LineEnd = lineNumber
+				emitterData.LineStart = lineNumber + 1
+				emitterData.LineEnd = lineNumber + 1
 				stop := contentBuffer.Emit(emitterData)
 				emitterData.Reset()
 				if stop {
