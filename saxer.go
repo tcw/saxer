@@ -25,7 +25,7 @@ var (
 	meta = kingpin.Flag("meta", "Get query meta data - linenumbers and path of matches (default false)").Short('m').Default("false").Bool()
 	firstN = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
 	unescape = kingpin.Flag("unescape", "Unescape html escape tokens (&lt; &gt; ...)").Short('u').Default("false").Bool()
-	caseSesitive = kingpin.Flag("case-sens", "Case sensitive tag-name and attribute matches (default true)").Short('s').Default("false").Bool()
+	caseSesitive = kingpin.Flag("case", "Case sensitive tag-name and attribute matches (default true)").Short('s').Default("false").Bool()
 	omitNamespace = kingpin.Flag("omit-ns", "Omit namespace in tag-name matches").Short('o').Default("false").Bool()
 	containMatch = kingpin.Flag("contains", "Maching of tag-name and attributes is executed by contains (not equals)").Short('c').Default("false").Bool()
 	wrapResult = kingpin.Flag("wrap", "Wrap result in Xml tag").Short('w').Default("false").Bool()
