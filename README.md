@@ -3,7 +3,7 @@
 ## Description
 
 After working with XML for years there has been one *nix tool that I've been missing.
-An xml exploration tool that can handle a subset of xpath queries for very large files.
+A xml exploration tool that can handle a subset of xpath queries for very large files.
 This is an attempt at creating such a tool.
 
 This tool is in alpha state!
