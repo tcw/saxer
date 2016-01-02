@@ -3,10 +3,10 @@
 ## Description
 
 After working with XML for years there has been one *nix tool that I've been missing.
-A xml exploration tool that can handle a subset of xpath queries for very large files.
+A fast xml exploration tool that can handle a subset of xpath queries for very large files.
 This is an attempt at creating such a tool.
 
-This tool is in alpha state!
+This tool is currently in alpha state!
 
 ## Install
 
@@ -36,40 +36,53 @@ This tool is in alpha state!
      <query>   Sax query expression
      [<file>]  xml-file
 
+##Example file (example.xml)
 
-### Simple Usage
+      <cars>
+       	<car vin="wp031" man="Volvo">
+       		<color>blue</color>
+       		<xs:doors>4</xs:doors>
+       		<engine nr="001">
+       			<Fuel>Gasoline</Fuel>
+       		</engine>
+       	</car>
+       	<car vin="wp032" man="Volvo">
+       		<color>red</color>
+       		<xs:doors>2</xs:doors>
+       		<engine nr="002">
+       			<Fuel>Diesel</Fuel>
+       		</engine>
+       	</car>
+       	<car vin="wp033" man="Saab">
+       		<color>yellow</color>
+       		<xs:doors>4</xs:doors>
+       		<engine nr="003">
+       			<Fuel>Diesel</Fuel>
+       		</engine>
+       	</car>
+       	<info>&lt;some-xml>data&lt;/some-xml></info>
+      </cars>
 
-TODO
 
-## Examples
+### Queries
 
+Query structure:
 
-### example.xml
+    <tag-name>?<attribute-key>=<attribute-value>&<attribute-key>=<attribute-value>& ...
 
-    <cars>
-    	<car vin="wp031" man="Volvo">
-    		<color>blue</color>
-    		<xs:doors>4</xs:doors>
-    		<engine nr="001">
-    			<Fuel>Gasoline</Fuel>
-    		</engine>
-    	</car>
-    	<car vin="wp032" man="Volvo">
-    		<color>red</color>
-    		<xs:doors>2</xs:doors>
-    		<engine nr="002">
-    			<Fuel>Diesel</Fuel>
-    		</engine>
-    	</car>
-    	<car vin="wp033" man="Saab">
-    		<color>yellow</color>
-    		<xs:doors>4</xs:doors>
-    		<engine nr="003">
-    			<Fuel>Diesel</Fuel>
-    		</engine>
-    	</car>
-    	<info>&lt;some-xml>data&lt;/some-xml></info>
-    </cars>
+Example of legal queries using example.xml file:
+
+    saxer car example.xml                           Result: All car nodes
+    saxer color example.xml                         Result: All color nodes
+    saxer engine example.xml                        Result: All engine nodes
+    saxer engine?nr example.xml                     Result: All engine nodes with nr as attribute key
+    saxer ?nr example.xml                           Result: All nodes with nr as attribute key
+    saxer engine?nr=003 example.xml                 Result: All engine nodes with nr as attribute key and 003 as value
+    saxer ?nr=003 example.xml                       Result: All nodes with nr as attribute key and 003 as value
+    saxer "car?vin=wp031&man=Volvo" example.xml     Result: All car nodes with vin as attribute key and wp031 as value
+                                                            and man as attribute key and Volvo as value
+
+## Example usage
 
 Command:
 
@@ -210,7 +223,3 @@ Command:
       <Fuel>Diesel</Fuel>
       <Fuel>Diesel</Fuel>
     </saxer-result>
-
-
-
-
