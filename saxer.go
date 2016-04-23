@@ -29,13 +29,14 @@ var (
 	omitNamespace = kingpin.Flag("omit-ns", "Omit namespace in tag-name matches").Short('o').Default("false").Bool()
 	containMatch = kingpin.Flag("contains", "Maching of tag-name and attributes is executed by contains (not equals)").Short('c').Default("false").Bool()
 	wrapResult = kingpin.Flag("wrap", "Wrap result in Xml tag").Short('w').Default("false").Bool()
+	singleLine = kingpin.Flag("single-line", "Each node will have a single line (Changes line endings!").Short('l').Default("false").Bool()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Default("4").Int()
 	contentBuf = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Default("4").Int()
 	cpuProfile = kingpin.Flag("profile-cpu", "Profile parser").Bool()
 )
 
-const ONE_KB  int = 1024
-const ONE_MB  int = ONE_KB * ONE_KB
+const ONE_KB int = 1024
+const ONE_MB int = ONE_KB * ONE_KB
 
 func main() {
 	kingpin.Version("0.0.5")
@@ -65,7 +66,7 @@ func main() {
 		}
 		defer file.Close()
 		SaxXmlInput(file)
-	}else {
+	} else {
 		reader := bufio.NewReader(os.Stdin)
 		SaxXmlInput(reader)
 	}
@@ -79,9 +80,13 @@ func emitterMetaPrinter(emitter chan contentBuffer.EmitterData, wg *sync.WaitGro
 	}
 }
 
-func emitterPrinter(emitter chan string, wg *sync.WaitGroup, ) {
+func emitterPrinter(emitter chan string, wg *sync.WaitGroup, line bool) {
 	for {
-		fmt.Println(<-emitter)
+		if line {
+			fmt.Println(strings.Replace(<-emitter, "\n", " ", -1))
+		} else {
+			fmt.Println(<-emitter)
+		}
 		wg.Done()
 	}
 }
@@ -110,7 +115,7 @@ func SaxXmlInput(reader io.Reader) {
 	tm := tagMatcher.NewTagMatcher(*query)
 	if *containMatch {
 		tm.EqualityFn = tagMatcher.EqFnContains
-	}else {
+	} else {
 		tm.EqualityFn = tagMatcher.EqFnEqulas
 	}
 	tm.CaseSensitive = !*caseSesitive
@@ -118,7 +123,7 @@ func SaxXmlInput(reader io.Reader) {
 	sr.IsInnerXml = *isInnerXml
 	sr.ContentBufferSize = *contentBuf * ONE_MB
 	sr.ElementBufferSize = *tagBuffer * ONE_KB
-	if *wrapResult{
+	if *wrapResult {
 		fmt.Println("<saxer-result>")
 	}
 	if *count {
@@ -130,7 +135,7 @@ func SaxXmlInput(reader io.Reader) {
 		sr.EmitterFn = emitterCounter
 		err = sr.Read(reader, &tm)
 		fmt.Println(counter)
-	}else if *meta {
+	} else if *meta {
 		counter := 0
 		elemChan := make(chan contentBuffer.EmitterData, 100)
 		var wg sync.WaitGroup
@@ -142,7 +147,7 @@ func SaxXmlInput(reader io.Reader) {
 				counter++
 				if counter >= *firstN {
 					return true
-				}else {
+				} else {
 					return false
 				}
 			}
@@ -151,14 +156,14 @@ func SaxXmlInput(reader io.Reader) {
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, &tm)
 		wg.Wait()
-	}else {
+	} else {
 		counter := 0
 		elemChan := make(chan string, 100)
 		var wg sync.WaitGroup
 		if *unescape {
 			go emitterPrinterConverter(elemChan, &wg)
-		}else {
-			go emitterPrinter(elemChan, &wg)
+		} else {
+			go emitterPrinter(elemChan, &wg, *singleLine)
 		}
 		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
@@ -167,7 +172,7 @@ func SaxXmlInput(reader io.Reader) {
 				counter++
 				if counter >= *firstN {
 					return true
-				}else {
+				} else {
 					return false
 				}
 			}
@@ -177,14 +182,13 @@ func SaxXmlInput(reader io.Reader) {
 		err = sr.Read(reader, &tm)
 		wg.Wait()
 	}
-	if *wrapResult{
+	if *wrapResult {
 		fmt.Println("</saxer-result>")
 	}
 	if err != nil {
 		panic(err)
 	}
 }
-
 
 func abs(name string) (string, error) {
 	if path.IsAbs(name) {

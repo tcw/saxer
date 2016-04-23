@@ -31,7 +31,7 @@ func (tp *TagPath) GetCurrentPath() string {
 	return buffer.String()
 }
 
-//Construction structs up front and reusing them for performance gain
+//Constructing structs up front and reusing them for zero gc
 func NewTagPath() *TagPath {
 	tp := &TagPath{make([]Tag, 100), 0}
 	for i := 0; i < len(tp.Path); i++ {
