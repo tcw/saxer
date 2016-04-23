@@ -17,24 +17,26 @@ This tool is currently in alpha state!
     usage: saxer [<flags>] <query> [<file>]
 
     Flags:
-         --help         Show context-sensitive help (also try --help-long and --help-man).
-     -i, --inner        Inner-xml of selected element (default false)
-     -n, --count        Number of matches (default false)
-     -m, --meta         Get query meta data - linenumbers and path of matches (default false)
-     -f, --firstN=0     First n matches (default (0 = all matches))
-     -u, --unescape     Unescape html escape tokens (&lt; &gt; ...)
-     -s, --case         Turn on case insensitivity
-     -o, --omit-ns      Omit namespace in tag-name matches
-     -c, --contains     Maching of tag-name and attributes is executed by contains (not equals)
-     -w, --wrap         Wrap result in Xml tag
-         --tag-buf=4    Size of element tag buffer in KB - tag size
-         --cont-buf=4   Size of content buffer in MB - returned elements size
-         --profile-cpu  Profile parser
-         --version      Show application version.
+          --help         Show context-sensitive help (also try --help-long and --help-man).
+      -i, --inner        Inner-xml of selected element (default false)
+      -n, --count        Number of matches (default false)
+      -m, --meta         Get query meta data - linenumbers and path of matches (default false)
+      -f, --firstN=0     First n matches (default (0 = all matches))
+      -u, --unescape     Unescape html escape tokens (&lt; &gt; ...)
+      -s, --case         Turn on case insensitivity
+      -o, --omit-ns      Omit namespace in tag-name matches
+      -c, --contains     Maching of tag-name and attributes is executed by contains (not equals)
+      -w, --wrap         Wrap result in Xml tag
+      -l, --single-line  Each node will have a single line (Changes line ending!)
+          --tag-buf=4    Size of element tag buffer in KB - tag size
+          --cont-buf=4   Size of content buffer in MB - returned elements size
+          --profile-cpu  Profile parser
+          --version      Show application version.
 
     Args:
-     <query>   Sax query expression
-     [<file>]  xml-file
+      <query>   Sax query expression
+      [<file>]  xml-file
+
 
 ##Example file (example.xml)
 
@@ -98,6 +100,15 @@ Command:
     <engine nr="002">
       <fuel>Diesel</fuel>
     </engine>
+
+Command:
+
+    saxer -l engine example.xml
+
+    Returns:
+    <engine nr="001"> <fuel>Gasoline</fuel> </engine>
+    <engine nr="002"> <fuel>Diesel</fuel> </engine>
+    <engine nr="002"> <fuel>Diesel</fuel> </engine>
 
 Command:
 

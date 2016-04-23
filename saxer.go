@@ -29,7 +29,7 @@ var (
 	omitNamespace = kingpin.Flag("omit-ns", "Omit namespace in tag-name matches").Short('o').Default("false").Bool()
 	containMatch = kingpin.Flag("contains", "Maching of tag-name and attributes is executed by contains (not equals)").Short('c').Default("false").Bool()
 	wrapResult = kingpin.Flag("wrap", "Wrap result in Xml tag").Short('w').Default("false").Bool()
-	singleLine = kingpin.Flag("single-line", "Each node will have a single line (Changes line endings!").Short('l').Default("false").Bool()
+	singleLine = kingpin.Flag("single-line", "Each node will have a single line (Changes line ending!)").Short('l').Default("false").Bool()
 	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Default("4").Int()
 	contentBuf = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Default("4").Int()
 	cpuProfile = kingpin.Flag("profile-cpu", "Profile parser").Bool()
@@ -39,7 +39,7 @@ const ONE_KB int = 1024
 const ONE_MB int = ONE_KB * ONE_KB
 
 func main() {
-	kingpin.Version("0.0.5")
+	kingpin.Version("0.0.6")
 	kingpin.Parse()
 
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
