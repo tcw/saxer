@@ -1,9 +1,12 @@
 package contentBuffer
 
+import "errors"
+
 type ContentBuffer struct {
-	buf           []byte
-	pos           int
-	emitterFn     func(*EmitterData) bool
+	size      int
+	buf       []byte
+	pos       int
+	emitterFn func(*EmitterData) bool
 }
 
 type EmitterData struct {
@@ -20,23 +23,31 @@ func (ed *EmitterData)Reset() {
 	ed.NodePath = ""
 }
 
-func NewContentBuffer(size int, emitter func(*EmitterData) bool) ContentBuffer {
-	i := make([]byte, size)
-	return ContentBuffer{buf: i, pos:0, emitterFn:emitter }
+func NewContentBuffer(bufferSize int, emitter func(*EmitterData) bool) ContentBuffer {
+	i := make([]byte, bufferSize)
+	return ContentBuffer{size:bufferSize, buf: i, pos:0, emitterFn:emitter }
 }
 
 func (cb *ContentBuffer)Reset() {
 	cb.pos = 0
 }
 
-func (cb *ContentBuffer)Add(b byte) {
+func (cb *ContentBuffer)Add(b byte) error {
+	if cb.size - 1 <= cb.pos {
+		return errors.New("ContentBuffer is full, use --cont-buf to increase buffer!")
+	}
 	cb.buf[cb.pos] = b
 	cb.pos++
+	return nil
 }
 
-func (cb *ContentBuffer)AddArray(b []byte) {
+func (cb *ContentBuffer)AddArray(b []byte) error{
+	if cb.size - 1 <= cb.pos + len(b) {
+		return errors.New("ContentBuffer is full, use --cont-buf to increase buffer!")
+	}
 	copy(cb.buf[cb.pos:], b)
 	cb.pos = cb.pos + len(b)
+	return nil
 }
 
 func (cb *ContentBuffer)Backup(step int) {

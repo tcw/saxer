@@ -56,7 +56,10 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 		for index := 0; index < n; index++ {
 			value := buffer[index]
 			if isRecoding {
-				contentBuf.Add(value)
+				bufferFullErr := contentBuf.Add(value)
+				if bufferFullErr != nil {
+					return bufferFullErr
+				}
 			}
 			if value == 0x0A {
 				lineNumber++
@@ -157,8 +160,14 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 		if !isRecoding {
 			matcher.AddTag(string(nodeContent[1:]))
 			if matcher.MatchesPath() {
-				contentBuffer.AddArray(nodeContent)
-				contentBuffer.Add(byte('>'))
+				bufferFullErr := contentBuffer.AddArray(nodeContent)
+				if bufferFullErr != nil {
+					return false,false,bufferFullErr
+				}
+				bufferFullErr = contentBuffer.Add(byte('>'))
+				if bufferFullErr != nil {
+					return false,false,bufferFullErr
+				}
 				emitterData.NodePath = matcher.GetCurrentPath()
 				emitterData.LineStart = lineNumber + 1
 				emitterData.LineEnd = lineNumber + 1
@@ -178,8 +187,14 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 		if !isRecoding {
 			if matcher.MatchesPath() {
 				if !isInnerXml {
-					contentBuffer.AddArray(nodeContent)
-					contentBuffer.Add(byte('>'))
+					bufferFullErr := contentBuffer.AddArray(nodeContent)
+					if bufferFullErr != nil {
+						return false,false,bufferFullErr
+					}
+					bufferFullErr = contentBuffer.Add(byte('>'))
+					if bufferFullErr != nil {
+						return false,false,bufferFullErr
+					}
 				}
 				emitterData.LineStart = lineNumber + 1
 				return false, true, nil

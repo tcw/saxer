@@ -57,11 +57,11 @@ func main() {
 	if strings.TrimSpace(*filename) != "" {
 		absFilename, err := abs(*filename)
 		if err != nil {
-			panic(err.Error())
+			fmt.Printf("Error finding file: %s\n",absFilename)
 		}
 		file, err := os.Open(absFilename)
 		if err != nil {
-			panic(err.Error())
+			fmt.Printf("Error opening file: %s\n",absFilename)
 		}
 		defer file.Close()
 		SaxXmlInput(file)
