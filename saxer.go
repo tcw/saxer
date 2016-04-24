@@ -12,7 +12,6 @@ import (
 	"log"
 	"runtime/pprof"
 	"sync"
-	"github.com/tcw/saxer/htmlConverter"
 	"github.com/tcw/saxer/contentBuffer"
 	"github.com/tcw/saxer/tagMatcher"
 )
@@ -39,7 +38,7 @@ const ONE_KB int = 1024
 const ONE_MB int = ONE_KB * ONE_KB
 
 func main() {
-	kingpin.Version("0.0.6")
+	kingpin.Version("0.0.7")
 	kingpin.Parse()
 
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
@@ -80,30 +79,22 @@ func emitterMetaPrinter(emitter chan contentBuffer.EmitterData, wg *sync.WaitGro
 	}
 }
 
-func emitterPrinter(emitter chan string, wg *sync.WaitGroup, line bool) {
+func emitterPrinter(emitter chan string, wg *sync.WaitGroup, line bool, htmlEscape bool) {
+	r := strings.NewReplacer("&quot;", "\"",
+		"&apos;", "'",
+		"&lt;", "<",
+		"&gt;", ">",
+		"&amp;", "&")
 	for {
+		node := <-emitter
+		if htmlEscape {
+			node = r.Replace(node)
+		}
 		if line {
-			fmt.Println(strings.Replace(<-emitter, "\n", " ", -1))
+			fmt.Println(strings.Replace(node, "\n", " ", -1))
 		} else {
-			fmt.Println(<-emitter)
+			fmt.Println(node)
 		}
-		wg.Done()
-	}
-}
-
-func emitterPrinterConverter(emitter chan string, wg *sync.WaitGroup) {
-	hc := htmlConverter.NewHtmlConverter()
-	buffer := make([]rune, 100)
-	cb := make([]rune, *contentBuf * ONE_MB)
-	contentPos := 0
-	for {
-		for _, value := range <-emitter {
-			n := hc.Translate(buffer, value)
-			copy(cb[contentPos:contentPos + n], buffer[:n])
-			contentPos = contentPos + n
-		}
-		fmt.Println(string(cb[:contentPos]))
-		contentPos = 0
 		wg.Done()
 	}
 }
@@ -160,11 +151,7 @@ func SaxXmlInput(reader io.Reader) {
 		counter := 0
 		elemChan := make(chan string, 100)
 		var wg sync.WaitGroup
-		if *unescape {
-			go emitterPrinterConverter(elemChan, &wg)
-		} else {
-			go emitterPrinter(elemChan, &wg, *singleLine)
-		}
+		go emitterPrinter(elemChan, &wg, *singleLine, *unescape)
 		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
 			elemChan <- ed.Content
