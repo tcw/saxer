@@ -4,11 +4,12 @@ import (
 	"io"
 	"github.com/tcw/saxer/histBuffer"
 	"github.com/tcw/saxer/contentBuffer"
-	"github.com/syndtr/goleveldb/leveldb/errors"
 	"fmt"
-	"github.com/hashicorp/errwrap"
+
 	"github.com/tcw/saxer/tagMatcher"
 	"github.com/tcw/saxer/tagBuffer"
+	"errors"
+	"github.com/hashicorp/errwrap"
 )
 
 type SaxReader struct {
