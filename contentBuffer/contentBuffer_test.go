@@ -1,15 +1,15 @@
 package contentBuffer
 
 import (
-	"testing"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 var actual string = ""
 
 var emitterData *EmitterData = &EmitterData{}
 
-func emitterTestFn(ed *EmitterData) bool{
+func emitterTestFn(ed *EmitterData) bool {
 	actual = ed.Content
 	return false
 }
@@ -43,4 +43,3 @@ func TestAddArray(t *testing.T) {
 	cb.Emit(emitterData)
 	assert.Equal(t, actual, "abc")
 }
-

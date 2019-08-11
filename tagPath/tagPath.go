@@ -1,4 +1,5 @@
 package tagPath
+
 import (
 	"bytes"
 )
@@ -24,7 +25,7 @@ func (tp *TagPath) GetCurrentPath() string {
 	var buffer bytes.Buffer
 	for key, value := range pathSlice {
 		buffer.WriteString(value.Name)
-		if key != len(pathSlice) - 1 {
+		if key != len(pathSlice)-1 {
 			buffer.WriteString("/")
 		}
 	}
