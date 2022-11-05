@@ -1,1 +1,0 @@
-go test ./contentBuffer ./histBuffer ./queryParser ./saxReader ./tagMatcher ./tagPath

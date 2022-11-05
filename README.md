@@ -10,7 +10,7 @@ This tool is currently in alpha state!
 
 ## Install
 
-    go get github.com/tcw/saxer
+    go install github.com/tcw/saxer@latest
 
 ## Usage
 
