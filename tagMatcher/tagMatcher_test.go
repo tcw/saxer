@@ -1,9 +1,9 @@
 package tagMatcher
-import (
-	"testing"
-	"github.com/stretchr/testify/assert"
-)
 
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 func TestAddTagWithAttributeWithSpace(t *testing.T) {
 	tm := NewTagMatcher("mediawiki")
@@ -49,7 +49,6 @@ func TestAddTagWithSecondTagNameAttributeMatchesOnlyAttributeQuery(t *testing.T)
 	tm.AddTag("text xml:space=\"preserve\"")
 	assert.True(t, tm.MatchesPath())
 }
-
 
 func TestMatchCaseInsensitive(t *testing.T) {
 	tm := NewTagMatcher("mediawiki")

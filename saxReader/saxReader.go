@@ -1,15 +1,14 @@
 package saxReader
 
 import (
-	"io"
-	"github.com/tcw/saxer/histBuffer"
-	"github.com/tcw/saxer/contentBuffer"
 	"fmt"
+	"github.com/tcw/saxer/contentBuffer"
+	"github.com/tcw/saxer/histBuffer"
+	"io"
 
-	"github.com/tcw/saxer/tagMatcher"
-	"github.com/tcw/saxer/tagBuffer"
 	"errors"
-	"github.com/hashicorp/errwrap"
+	"github.com/tcw/saxer/tagBuffer"
+	"github.com/tcw/saxer/tagMatcher"
 )
 
 type SaxReader struct {
@@ -21,17 +20,17 @@ type SaxReader struct {
 	IsInnerXml        bool
 }
 
-const ONE_KB  int = 1024
-const ONE_MB  int = ONE_KB * ONE_KB
+const ONE_KB int = 1024
+const ONE_MB int = ONE_KB * ONE_KB
 
 func NewSaxReaderNoEmitter() SaxReader {
 
-	return SaxReader{ElementBufferSize:ONE_KB * 4,
-		ContentBufferSize:ONE_MB * 4,
-		ReaderBufferSize:ONE_KB * 4,
-		PathDepthSize:1000,
-		EmitterFn:nil,
-		IsInnerXml:false}
+	return SaxReader{ElementBufferSize: ONE_KB * 4,
+		ContentBufferSize: ONE_MB * 4,
+		ReaderBufferSize:  ONE_KB * 4,
+		PathDepthSize:     1000,
+		EmitterFn:         nil,
+		IsInnerXml:        false}
 }
 
 func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
@@ -85,7 +84,7 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 			}
 			if value == byte('<') {
 				if tb.LocalStart != -1 || tb.Position > 0 {
-					return errors.New(fmt.Sprintf("Validation error found two '<' chars in a row (last on line %d)", lineNumber + 1))
+					return errors.New(fmt.Sprintf("Validation error found two '<' chars in a row (last on line %d)", lineNumber+1))
 				}
 				tb.LocalStart = index
 			}
@@ -94,41 +93,41 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 					tb.LocalEnd = index
 				}
 			}
-			if ((tb.LocalStart != -1 && index != 0 && tb.LocalStart == index - 1) && (value == byte('!') || value == byte('?'))) ||
-			(index == 0 && tb.Position == 1 && (value == byte('!') || value == byte('?'))) {
+			if ((tb.LocalStart != -1 && index != 0 && tb.LocalStart == index-1) && (value == byte('!') || value == byte('?'))) ||
+				(index == 0 && tb.Position == 1 && (value == byte('!') || value == byte('?'))) {
 				inEscapeMode = true
 				tb.ResetState()
-			}else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
+			} else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
 				stop, isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, tm, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}
 				if err != nil {
-					return errwrap.Wrapf(fmt.Sprintf("Error on line %d {{err}}", lineNumber + 1), err)
+					return fmt.Errorf("Error on line %d %w", lineNumber+1, err)
 				}
 				tb.ResetLocalState()
-			}else if tb.LocalEnd != -1 {
+			} else if tb.LocalEnd != -1 {
 				tb.Add(buffer[:tb.LocalEnd])
 				stop, isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, tm, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}
 				if err != nil {
-					return errwrap.Wrapf(fmt.Sprintf("Error on line %d {{err}}", lineNumber + 1), err)
+					return fmt.Errorf("Error on line %d %w", lineNumber+1, err)
 				}
 				tb.ResetState()
 			}
 		}
 		if tb.LocalStart == -1 && tb.LocalEnd == -1 && tb.Position > 0 {
 			tb.Add(buffer)
-		}else if tb.LocalStart != -1 {
+		} else if tb.LocalStart != -1 {
 			tb.Add(buffer[tb.LocalStart:n])
 		}
 	}
 	return nil
 }
 
-//todo: clean up!
+// todo: clean up!
 func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher, emitterData *contentBuffer.EmitterData, isRecoding bool, isInnerXml bool, lineNumber uint64) (bool, bool, error) {
 	if nodeContent[1] == byte('/') {
 		if tb.StartTags == 0 {
@@ -149,7 +148,7 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 				contentBuffer.Reset()
 				matcher.RemoveLast()
 				return false, false, nil
-			}else {
+			} else {
 				matcher.RemoveLast()
 				return false, true, nil
 			}
@@ -157,17 +156,17 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 		tb.StartTags--
 		matcher.RemoveLast()
 		return false, false, nil
-	}else if nodeContent[len(nodeContent) - 1] == byte('/') {
+	} else if nodeContent[len(nodeContent)-1] == byte('/') {
 		if !isRecoding {
 			matcher.AddTag(string(nodeContent[1:]))
 			if matcher.MatchesPath() {
 				bufferFullErr := contentBuffer.AddArray(nodeContent)
 				if bufferFullErr != nil {
-					return false,false,bufferFullErr
+					return false, false, bufferFullErr
 				}
 				bufferFullErr = contentBuffer.Add(byte('>'))
 				if bufferFullErr != nil {
-					return false,false,bufferFullErr
+					return false, false, bufferFullErr
 				}
 				emitterData.NodePath = matcher.GetCurrentPath()
 				emitterData.LineStart = lineNumber + 1
@@ -182,7 +181,7 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 			matcher.RemoveLast()
 		}
 		return false, isRecoding, nil
-	}else {
+	} else {
 		matcher.AddTag(string(nodeContent[1:]))
 		tb.StartTags++
 		if !isRecoding {
@@ -190,19 +189,19 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 				if !isInnerXml {
 					bufferFullErr := contentBuffer.AddArray(nodeContent)
 					if bufferFullErr != nil {
-						return false,false,bufferFullErr
+						return false, false, bufferFullErr
 					}
 					bufferFullErr = contentBuffer.Add(byte('>'))
 					if bufferFullErr != nil {
-						return false,false,bufferFullErr
+						return false, false, bufferFullErr
 					}
 				}
 				emitterData.LineStart = lineNumber + 1
 				return false, true, nil
-			}else {
+			} else {
 				return false, false, nil
 			}
-		}else {
+		} else {
 			return false, true, nil
 		}
 	}

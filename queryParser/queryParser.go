@@ -1,8 +1,8 @@
 package queryParser
 
 import (
-	"strings"
 	"github.com/tcw/saxer/tagPath"
+	"strings"
 )
 
 func Parse(query string) *tagPath.TagPath {
@@ -31,12 +31,12 @@ func addTag(tagText string, tp *tagPath.TagPath) {
 					for _, val := range attr {
 						addToAttribute(val, tag)
 					}
-				}else {
+				} else {
 					addToAttribute(elem[1], tag)
 				}
 			}
 		}
-	}else {
+	} else {
 		tag.Name = tagText
 	}
 }
@@ -45,7 +45,7 @@ func addToAttribute(attr string, tg *tagPath.Tag) {
 	if strings.Contains(attr, "=") {
 		attrKeyVal := strings.Split(attr, "=")
 		tg.AddAttribute(attrKeyVal[0], attrKeyVal[1])
-	}else {
+	} else {
 		tg.AddAttribute(attr, "")
 	}
 }

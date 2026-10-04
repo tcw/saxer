@@ -1,37 +1,37 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"path"
-	"gopkg.in/alecthomas/kingpin.v2"
-	"github.com/tcw/saxer/saxReader"
-	"io"
 	"bufio"
-	"strings"
-	"log"
-	"runtime/pprof"
-	"sync"
+	"fmt"
 	"github.com/tcw/saxer/contentBuffer"
+	"github.com/tcw/saxer/saxReader"
 	"github.com/tcw/saxer/tagMatcher"
+	"gopkg.in/alecthomas/kingpin.v2"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"runtime/pprof"
+	"strings"
+	"sync"
 )
 
 var (
-	query = kingpin.Arg("query", "Sax query expression").Required().String()
-	filename = kingpin.Arg("file", "xml-file").String()
-	isInnerXml = kingpin.Flag("inner", "Inner-xml of selected element (default false)").Short('i').Default("false").Bool()
-	count = kingpin.Flag("count", "Number of matches (default false)").Short('n').Default("false").Bool()
-	meta = kingpin.Flag("meta", "Get query meta data - linenumbers and path of matches (default false)").Short('m').Default("false").Bool()
-	firstN = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
-	unescape = kingpin.Flag("unescape", "Unescape html escape tokens (&lt; &gt; ...)").Short('u').Default("false").Bool()
-	caseSesitive = kingpin.Flag("case", "Turn on case insensitivity").Short('s').Default("false").Bool()
+	query         = kingpin.Arg("query", "Sax query expression").Required().String()
+	filename      = kingpin.Arg("file", "xml-file").String()
+	isInnerXml    = kingpin.Flag("inner", "Inner-xml of selected element (default false)").Short('i').Default("false").Bool()
+	count         = kingpin.Flag("count", "Number of matches (default false)").Short('n').Default("false").Bool()
+	meta          = kingpin.Flag("meta", "Get query meta data - linenumbers and path of matches (default false)").Short('m').Default("false").Bool()
+	firstN        = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
+	unescape      = kingpin.Flag("unescape", "Unescape html escape tokens (&lt; &gt; ...)").Short('u').Default("false").Bool()
+	caseSesitive  = kingpin.Flag("case", "Turn on case insensitivity").Short('s').Default("false").Bool()
 	omitNamespace = kingpin.Flag("omit-ns", "Omit namespace in tag-name matches").Short('o').Default("false").Bool()
-	containMatch = kingpin.Flag("contains", "Maching of tag-name and attributes is executed by contains (not equals)").Short('c').Default("false").Bool()
-	wrapResult = kingpin.Flag("wrap", "Wrap result in Xml tag").Short('w').Default("false").Bool()
-	singleLine = kingpin.Flag("single-line", "Each node will have a single line (Changes line ending!)").Short('l').Default("false").Bool()
-	tagBuffer = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Default("4").Int()
-	contentBuf = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Default("4").Int()
-	cpuProfile = kingpin.Flag("profile-cpu", "Profile parser").Bool()
+	containMatch  = kingpin.Flag("contains", "Maching of tag-name and attributes is executed by contains (not equals)").Short('c').Default("false").Bool()
+	wrapResult    = kingpin.Flag("wrap", "Wrap result in Xml tag").Short('w').Default("false").Bool()
+	singleLine    = kingpin.Flag("single-line", "Each node will have a single line (Changes line ending!)").Short('l').Default("false").Bool()
+	tagBuffer     = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Default("4").Int()
+	contentBuf    = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Default("4").Int()
+	cpuProfile    = kingpin.Flag("profile-cpu", "Profile parser").Bool()
 )
 
 const ONE_KB int = 1024
@@ -55,13 +55,15 @@ func main() {
 	}
 
 	if strings.TrimSpace(*filename) != "" {
-		absFilename, err := abs(*filename)
+		absFilename, err := filepath.Abs(*filename)
 		if err != nil {
-			fmt.Printf("Error finding file: %s\n",absFilename)
+			fmt.Fprintf(os.Stderr, "Error finding file: %s\n", *filename)
+			os.Exit(1)
 		}
 		file, err := os.Open(absFilename)
 		if err != nil {
-			fmt.Printf("Error opening file: %s\n",absFilename)
+			fmt.Fprintf(os.Stderr, "Error opening file: %s\n", absFilename)
+			os.Exit(1)
 		}
 		defer file.Close()
 		SaxXmlInput(file)
@@ -122,7 +124,7 @@ func SaxXmlInput(reader io.Reader) {
 		emitterCounter := func(ed *contentBuffer.EmitterData) bool {
 			counter++
 			return false
-		};
+		}
 		sr.EmitterFn = emitterCounter
 		err = sr.Read(reader, &tm)
 		fmt.Println(counter)
@@ -133,7 +135,7 @@ func SaxXmlInput(reader io.Reader) {
 		go emitterMetaPrinter(elemChan, &wg)
 		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
-			elemChan <- contentBuffer.EmitterData{Content:ed.Content, LineStart:ed.LineStart, LineEnd:ed.LineEnd, NodePath:ed.NodePath}
+			elemChan <- contentBuffer.EmitterData{Content: ed.Content, LineStart: ed.LineStart, LineEnd: ed.LineEnd, NodePath: ed.NodePath}
 			if *firstN > 0 {
 				counter++
 				if counter >= *firstN {
@@ -143,7 +145,7 @@ func SaxXmlInput(reader io.Reader) {
 				}
 			}
 			return false
-		};
+		}
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, &tm)
 		wg.Wait()
@@ -164,7 +166,7 @@ func SaxXmlInput(reader io.Reader) {
 				}
 			}
 			return false
-		};
+		}
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, &tm)
 		wg.Wait()
@@ -175,12 +177,4 @@ func SaxXmlInput(reader io.Reader) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func abs(name string) (string, error) {
-	if path.IsAbs(name) {
-		return name, nil
-	}
-	wd, err := os.Getwd()
-	return path.Join(wd, name), err
 }

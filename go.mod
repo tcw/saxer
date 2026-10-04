@@ -3,10 +3,7 @@ module github.com/tcw/saxer
 go 1.19
 
 require (
-	github.com/google/gxui v0.0.0-20150908103951-66442cc6fb27
-	github.com/hashicorp/errwrap v0.0.0-20141028054710-7554cd9344ce
 	github.com/stretchr/testify v1.8.1
-	github.com/zacg/testify v0.0.0-20140707002044-0b2d4bd70316
 	gopkg.in/alecthomas/kingpin.v2 v2.1.6
 )
 

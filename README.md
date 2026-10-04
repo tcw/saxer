@@ -38,7 +38,7 @@ This tool is currently in alpha state!
       [<file>]  xml-file
 
 
-##Example file (example.xml)
+## Example file (example.xml)
 
       <cars>
        	<car vin="wp031" man="Volvo">
