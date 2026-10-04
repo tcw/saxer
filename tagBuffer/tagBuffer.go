@@ -1,5 +1,9 @@
 package tagBuffer
 
+import "errors"
+
+var ErrFull = errors.New("tag is larger than the tag buffer, use --tag-buf to increase buffer")
+
 type TagBuffer struct {
 	buffer     []byte
 	Position   int
@@ -23,9 +27,13 @@ func (eb *TagBuffer) ResetState() {
 	eb.Position = 0
 }
 
-func (eb *TagBuffer) Add(b []byte) {
+func (eb *TagBuffer) Add(b []byte) error {
+	if eb.Position+len(b) > len(eb.buffer) {
+		return ErrFull
+	}
 	copy(eb.buffer[eb.Position:], b)
 	eb.Position = eb.Position + len(b)
+	return nil
 }
 
 func (eb *TagBuffer) GetBuffer() []byte {

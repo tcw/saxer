@@ -2,11 +2,17 @@ package saxReader
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
+	"strings"
+	"testing"
+	"testing/iotest"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tcw/saxer/contentBuffer"
 	"github.com/tcw/saxer/tagMatcher"
-	"testing"
 )
 
 func newTestSaxReader(emitterTestFn func(*contentBuffer.EmitterData) bool) SaxReader {
@@ -200,7 +206,6 @@ func TestParseXmlOneNodeWithEndElementBeforeStartError(t *testing.T) {
 	saxReader := newTestSaxReader(emitter)
 	tm := tagMatcher.NewTagMatcher("hello")
 	err := saxReader.Read(reader, &tm)
-	fmt.Println(err)
 	assert.NotNil(t, err)
 }
 
@@ -300,4 +305,184 @@ func TestParseXmlTestS2(t *testing.T) {
 	err := saxReader.Read(reader, &tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<text xml:space=\"preserve\">this</text>")
+}
+
+// readAll runs sr over r with query and collects every emitted element.
+func readAll(sr SaxReader, r io.Reader, query string) ([]string, error) {
+	var got []string
+	sr.EmitterFn = func(ed *contentBuffer.EmitterData) bool {
+		got = append(got, ed.Content)
+		return false
+	}
+	tm := tagMatcher.NewTagMatcher(query)
+	err := sr.Read(r, &tm)
+	return got, err
+}
+
+// Wrappers that deliver the same bytes in different, but legal, ways.
+var readerWrappers = map[string]func(io.Reader) io.Reader{
+	"plain":   func(r io.Reader) io.Reader { return r },
+	"onebyte": iotest.OneByteReader,
+	"half":    iotest.HalfReader,
+	"dataerr": iotest.DataErrReader,
+}
+
+// The result must not depend on how the input is chunked by the reader.
+func TestReadIsIndependentOfChunking(t *testing.T) {
+	tests := []struct {
+		name  string
+		xml   string
+		query string
+		want  []string
+	}{
+		{"attributes", `<a><b x="1">one</b><b x="2">two</b></a>`, "a/b",
+			[]string{`<b x="1">one</b>`, `<b x="2">two</b>`}},
+		{"attribute filter", `<a><b x="1">one</b><b x="2">two</b></a>`, "b?x=2",
+			[]string{`<b x="2">two</b>`}},
+		{"self-closing", `<a><b x="1"/><b x="2"/></a>`, "b",
+			[]string{`<b x="1"/>`, `<b x="2"/>`}},
+		{"comment and cdata", `<a><!-- <b> --><b><![CDATA[<b>]]></b></a>`, "b",
+			[]string{`<b><![CDATA[<b>]]></b>`}},
+		{"prolog and doctype", `<?xml version="1.0"?><!DOCTYPE a><a><b>v</b></a>`, "b",
+			[]string{`<b>v</b>`}},
+		{"attributes on new lines", "<a>\n<b\n  x=\"1\"\n  y=\"2\">v</b></a>", "b?y=2",
+			[]string{"<b\n  x=\"1\"\n  y=\"2\">v</b>"}},
+		{"long tag", `<a><b attr="` + strings.Repeat("x", 50) + `">v</b></a>`, "b",
+			[]string{`<b attr="` + strings.Repeat("x", 50) + `">v</b>`}},
+	}
+	for _, tt := range tests {
+		for wrapName, wrap := range readerWrappers {
+			for _, bufSize := range []int{1, 2, 3, 5, 8, 64, 4096} {
+				t.Run(fmt.Sprintf("%s/%s/buf%d", tt.name, wrapName, bufSize), func(t *testing.T) {
+					sr := NewSaxReaderNoEmitter()
+					sr.ReaderBufferSize = bufSize
+					got, err := readAll(sr, wrap(strings.NewReader(tt.xml)), tt.query)
+					require.NoError(t, err)
+					assert.Equal(t, tt.want, got)
+				})
+			}
+		}
+	}
+}
+
+func TestReadDoctype(t *testing.T) {
+	tests := []struct {
+		name string
+		xml  string
+	}{
+		{"simple", `<!DOCTYPE a><a><b>v</b></a>`},
+		{"public id", `<!DOCTYPE a PUBLIC "-//x//EN" "a>b.dtd"><a><b>v</b></a>`},
+		{"internal subset", `<!DOCTYPE a [<!ELEMENT a (b)><!ENTITY e "x>y">]><a><b>v</b></a>`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readAll(NewSaxReaderNoEmitter(), strings.NewReader(tt.xml), "b")
+			require.NoError(t, err)
+			assert.Equal(t, []string{"<b>v</b>"}, got)
+		})
+	}
+}
+
+func TestReadGreaterThanInAttributeValue(t *testing.T) {
+	got, err := readAll(NewSaxReaderNoEmitter(), strings.NewReader(`<a><b x="1>2" y='3>4'>v</b></a>`), "b?x=1>2")
+	require.NoError(t, err)
+	assert.Equal(t, []string{`<b x="1>2" y='3>4'>v</b>`}, got)
+}
+
+func TestReadReturnsReaderError(t *testing.T) {
+	readErr := errors.New("disk on fire")
+	r := io.MultiReader(strings.NewReader("<a><b>v</b>"), iotest.ErrReader(readErr))
+	_, err := readAll(NewSaxReaderNoEmitter(), r, "b")
+	assert.ErrorIs(t, err, readErr)
+}
+
+func TestReadTagLargerThanTagBuffer(t *testing.T) {
+	sr := NewSaxReaderNoEmitter()
+	sr.ReaderBufferSize = 8
+	sr.ElementBufferSize = 16
+	_, err := readAll(sr, strings.NewReader(`<a><b attr="`+strings.Repeat("x", 100)+`">v</b></a>`), "b")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--tag-buf")
+}
+
+func TestReadContentLargerThanContentBuffer(t *testing.T) {
+	sr := NewSaxReaderNoEmitter()
+	sr.ContentBufferSize = 16
+	_, err := readAll(sr, strings.NewReader(`<a><b>`+strings.Repeat("x", 100)+`</b></a>`), "b")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--cont-buf")
+}
+
+func TestReadTruncatedDocument(t *testing.T) {
+	tests := []struct {
+		name string
+		xml  string
+		want []string
+	}{
+		{"inside element", `<a><b>one`, nil},
+		{"unclosed root", `<a><b>x</b>`, []string{"<b>x</b>"}},
+		{"inside tag", `<a><b x="1`, nil},
+		{"inside comment", `<a><!-- x`, nil},
+		{"inside cdata", `<a><![CDATA[ x`, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readAll(NewSaxReaderNoEmitter(), strings.NewReader(tt.xml), "b")
+			assert.Equal(t, tt.want, got)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "unexpected end of input")
+		})
+	}
+}
+
+func TestReadMalformedInputReturnsError(t *testing.T) {
+	for _, xml := range []string{
+		`<>`,
+		`<a></a></a>`,
+		`<a><b x=1>v</b></a>`,
+		`<a><b x="1" y>v</b></a>`,
+		strings.Repeat("<a>", 1000),
+	} {
+		t.Run(xml, func(t *testing.T) {
+			_, err := readAll(NewSaxReaderNoEmitter(), strings.NewReader(xml), "b")
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestReadStopsWhenEmitterSaysSo(t *testing.T) {
+	var got []string
+	sr := NewSaxReaderNoEmitter()
+	sr.EmitterFn = func(ed *contentBuffer.EmitterData) bool {
+		got = append(got, ed.Content)
+		return len(got) == 2
+	}
+	tm := tagMatcher.NewTagMatcher("b")
+	err := sr.Read(strings.NewReader(`<a><b>1</b><b>2</b><b>3</b></a>`), &tm)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"<b>1</b>", "<b>2</b>"}, got)
+}
+
+// The parser must never panic, and its result must not depend on chunking.
+func FuzzRead(f *testing.F) {
+	for _, seed := range []string{
+		`<a><b x="1">one</b><b x="2">two</b></a>`,
+		`<?xml version="1.0"?><!DOCTYPE a [<!ENTITY e "x">]><a><!-- c --><b><![CDATA[<]]></b></a>`,
+		`<a><b x="1>2"/></a>`,
+		`<a><b>`,
+	} {
+		f.Add(seed, uint8(3))
+	}
+	f.Fuzz(func(t *testing.T, xml string, bufSize uint8) {
+		sr := NewSaxReaderNoEmitter()
+		sr.ElementBufferSize = 64
+		sr.ContentBufferSize = 256
+		want, wantErr := readAll(sr, strings.NewReader(xml), "b")
+		sr.ReaderBufferSize = int(bufSize%16) + 1
+		got, gotErr := readAll(sr, iotest.HalfReader(strings.NewReader(xml)), "b")
+		if wantErr == nil {
+			assert.NoError(t, gotErr)
+			assert.Equal(t, want, got)
+		}
+	})
 }

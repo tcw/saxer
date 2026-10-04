@@ -32,9 +32,15 @@ func (tp *TagPath) GetCurrentPath() string {
 	return buffer.String()
 }
 
+// Limits of the preallocated path.
+const (
+	MaxDepth      = 100
+	MaxAttributes = 100
+)
+
 // Constructing structs up front and reusing them for zero gc
 func NewTagPath() *TagPath {
-	tp := &TagPath{make([]Tag, 100), 0}
+	tp := &TagPath{make([]Tag, MaxDepth), 0}
 	for i := 0; i < len(tp.Path); i++ {
 		tp.Path[i] = newTag()
 		for j := 0; j < len(tp.Path[i].Attributes); j++ {
@@ -45,7 +51,7 @@ func NewTagPath() *TagPath {
 }
 
 func newTag() Tag {
-	return Tag{"", make([]Attribute, 100), 0}
+	return Tag{"", make([]Attribute, MaxAttributes), 0}
 }
 
 func newAttribute() Attribute {

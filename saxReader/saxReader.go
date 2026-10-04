@@ -33,25 +33,41 @@ func NewSaxReaderNoEmitter() SaxReader {
 		IsInnerXml:        false}
 }
 
+// Kinds of markup that is skipped until its terminator: <!-- -->, <![CDATA[ ]]>,
+// <? ?> and declarations such as <!DOCTYPE ...>.
+const (
+	escapeNone        = 0
+	escapeBang        = 1 // seen "<!", kind not known yet
+	escapeComment     = 2
+	escapeCdata       = 3
+	escapePI          = 4
+	escapeDeclaration = 5
+)
+
+var escapeNames = map[int]string{
+	escapeBang:        "declaration",
+	escapeComment:     "comment",
+	escapeCdata:       "CDATA section",
+	escapePI:          "processing instruction",
+	escapeDeclaration: "declaration",
+}
+
 func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 	tb := tagBuffer.NewTagBuffer(sr.ElementBufferSize)
 	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
 	contentBuf := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
 	buffer := make([]byte, sr.ReaderBufferSize)
 	emitterData := &contentBuffer.EmitterData{}
-	inEscapeMode := false
+	escape := escapeNone
+	var quote byte = 0    // quote char of the attribute value being read, inside tags and declarations
+	declarationDepth := 0 // nesting of [ ] in a declaration (DOCTYPE internal subset)
 	isRecoding := false
 	stop := false
+	var err error
 	var lineNumber uint64 = 0
 
 	for {
-		n, err := reader.Read(buffer)
-		if n != 0 && err != nil {
-			panic("Error while reading xml")
-		}
-		if n == 0 {
-			break
-		}
+		n, readErr := reader.Read(buffer)
 		tb.ResetLocalState()
 		for index := 0; index < n; index++ {
 			value := buffer[index]
@@ -64,38 +80,79 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 			if value == 0x0A {
 				lineNumber++
 			}
-			if inEscapeMode {
+			if escape != escapeNone {
 				history.Add(value)
-				if value == byte('>') {
-					if history.HasLast([]byte{'-', '-', '>'}) {
-						inEscapeMode = false
-						continue
+				if escape == escapeBang {
+					switch value {
+					case '-':
+						escape = escapeComment
+					case '[':
+						escape = escapeCdata
+					default:
+						escape = escapeDeclaration
 					}
-					if history.HasLast([]byte{']', ']', '>'}) {
-						inEscapeMode = false
-						continue
+				}
+				switch escape {
+				case escapeComment:
+					if value == '>' && history.HasLast([]byte("-->")) {
+						escape = escapeNone
 					}
-					if history.HasLast([]byte{'?', '>'}) {
-						inEscapeMode = false
-						continue
+				case escapeCdata:
+					if value == '>' && history.HasLast([]byte("]]>")) {
+						escape = escapeNone
+					}
+				case escapePI:
+					if value == '>' && history.HasLast([]byte("?>")) {
+						escape = escapeNone
+					}
+				case escapeDeclaration:
+					switch {
+					case quote != 0:
+						if value == quote {
+							quote = 0
+						}
+					case value == '"' || value == '\'':
+						quote = value
+					case value == '[':
+						declarationDepth++
+					case value == ']':
+						declarationDepth--
+					case value == '>' && declarationDepth <= 0:
+						escape = escapeNone
+						declarationDepth = 0
 					}
 				}
 				continue
 			}
+			inTag := tb.LocalStart != -1 || tb.Position > 0
+			if inTag && quote != 0 {
+				if value == quote {
+					quote = 0
+				}
+				continue
+			}
+			if inTag && (value == '"' || value == '\'') {
+				quote = value
+				continue
+			}
 			if value == byte('<') {
-				if tb.LocalStart != -1 || tb.Position > 0 {
+				if inTag {
 					return errors.New(fmt.Sprintf("Validation error found two '<' chars in a row (last on line %d)", lineNumber+1))
 				}
 				tb.LocalStart = index
 			}
 			if value == byte('>') {
-				if tb.LocalStart != -1 || tb.Position > 0 {
+				if inTag {
 					tb.LocalEnd = index
 				}
 			}
 			if ((tb.LocalStart != -1 && index != 0 && tb.LocalStart == index-1) && (value == byte('!') || value == byte('?'))) ||
 				(index == 0 && tb.Position == 1 && (value == byte('!') || value == byte('?'))) {
-				inEscapeMode = true
+				if value == '!' {
+					escape = escapeBang
+				} else {
+					escape = escapePI
+				}
 				tb.ResetState()
 			} else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
 				stop, isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, tm, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
@@ -107,7 +164,9 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 				}
 				tb.ResetLocalState()
 			} else if tb.LocalEnd != -1 {
-				tb.Add(buffer[:tb.LocalEnd])
+				if err = tb.Add(buffer[:tb.LocalEnd]); err != nil {
+					return fmt.Errorf("Error on line %d %w", lineNumber+1, err)
+				}
 				stop, isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, tm, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
@@ -118,21 +177,43 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 				tb.ResetState()
 			}
 		}
+		var addErr error
 		if tb.LocalStart == -1 && tb.LocalEnd == -1 && tb.Position > 0 {
-			tb.Add(buffer)
+			addErr = tb.Add(buffer[:n])
 		} else if tb.LocalStart != -1 {
-			tb.Add(buffer[tb.LocalStart:n])
+			addErr = tb.Add(buffer[tb.LocalStart:n])
 		}
+		if addErr != nil {
+			return fmt.Errorf("Error on line %d %w", lineNumber+1, addErr)
+		}
+		if readErr == io.EOF {
+			break
+		}
+		if readErr != nil {
+			return fmt.Errorf("error reading xml: %w", readErr)
+		}
+	}
+	switch {
+	case escape != escapeNone:
+		return fmt.Errorf("unexpected end of input inside %s", escapeNames[escape])
+	case tb.LocalStart != -1 || tb.Position > 0:
+		return errors.New("unexpected end of input inside tag")
+	case tb.StartTags > 0:
+		return fmt.Errorf("unexpected end of input, %d element(s) not closed", tb.StartTags)
 	}
 	return nil
 }
 
 // todo: clean up!
 func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher, emitterData *contentBuffer.EmitterData, isRecoding bool, isInnerXml bool, lineNumber uint64) (bool, bool, error) {
+	if len(nodeContent) < 2 {
+		return false, isRecoding, errors.New("found empty tag <>")
+	}
 	if nodeContent[1] == byte('/') {
 		if tb.StartTags == 0 {
 			return false, isRecoding, errors.New("found end tag before start tag")
 		}
+		tb.StartTags--
 		if isRecoding {
 			if matcher.TagNameMatchesLastMatch() {
 				if isInnerXml {
@@ -153,12 +234,13 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 				return false, true, nil
 			}
 		}
-		tb.StartTags--
 		matcher.RemoveLast()
 		return false, false, nil
 	} else if nodeContent[len(nodeContent)-1] == byte('/') {
 		if !isRecoding {
-			matcher.AddTag(string(nodeContent[1:]))
+			if err := matcher.AddTag(string(nodeContent[1:])); err != nil {
+				return false, false, err
+			}
 			if matcher.MatchesPath() {
 				bufferFullErr := contentBuffer.AddArray(nodeContent)
 				if bufferFullErr != nil {
@@ -182,7 +264,9 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 		}
 		return false, isRecoding, nil
 	} else {
-		matcher.AddTag(string(nodeContent[1:]))
+		if err := matcher.AddTag(string(nodeContent[1:])); err != nil {
+			return false, isRecoding, err
+		}
 		tb.StartTags++
 		if !isRecoding {
 			if matcher.MatchesPath() {

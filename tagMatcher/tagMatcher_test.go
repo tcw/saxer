@@ -1,8 +1,11 @@
 package tagMatcher
 
 import (
-	"github.com/stretchr/testify/assert"
+	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/tcw/saxer/tagPath"
 )
 
 func TestAddTagWithAttributeWithSpace(t *testing.T) {
@@ -104,4 +107,32 @@ func TestMatchContainAttributeValue(t *testing.T) {
 	tm.EqualityFn = EqFnContains
 	tm.AddTag("mediaWiki referance=\"12345\"")
 	assert.True(t, tm.MatchesPath())
+}
+
+func TestAddTagWithAttributeOnNewLine(t *testing.T) {
+	tm := NewTagMatcher("mediawiki?id=1&lang=en")
+	assert.NoError(t, tm.AddTag("mediawiki\n\tid=\"1\"\r\n\tlang=\"en\""))
+	assert.True(t, tm.MatchesPath())
+}
+
+func TestAddTagMalformedAttributes(t *testing.T) {
+	tm := NewTagMatcher("a")
+	assert.Error(t, tm.AddTag("a x=1"))
+}
+
+func TestAddTagTooDeep(t *testing.T) {
+	tm := NewTagMatcher("a")
+	for i := 0; i < tagPath.MaxDepth; i++ {
+		assert.NoError(t, tm.AddTag("a"))
+	}
+	assert.Error(t, tm.AddTag("a"))
+}
+
+func TestAddTagTooManyAttributes(t *testing.T) {
+	tm := NewTagMatcher("a")
+	tag := "a"
+	for i := 0; i <= tagPath.MaxAttributes; i++ {
+		tag += fmt.Sprintf(" a%d=\"%d\"", i, i)
+	}
+	assert.Error(t, tm.AddTag(tag))
 }
