@@ -44,30 +44,32 @@ Reading from stdin:
 
 ## Example file (example.xml)
 
-      <cars>
-       	<car vin="wp031" man="Volvo">
-       		<color>blue</color>
-       		<xs:doors>4</xs:doors>
-       		<engine nr="001">
-       			<Fuel>Gasoline</Fuel>
-       		</engine>
-       	</car>
-       	<car vin="wp032" man="Volvo">
-       		<color>red</color>
-       		<xs:doors>2</xs:doors>
-       		<engine nr="002">
-       			<Fuel>Diesel</Fuel>
-       		</engine>
-       	</car>
-       	<car vin="wp033" man="Saab">
-       		<color>yellow</color>
-       		<xs:doors>4</xs:doors>
-       		<engine nr="003">
-       			<Fuel>Diesel</Fuel>
-       		</engine>
-       	</car>
-       	<info>&lt;some-xml>data&lt;/some-xml></info>
-      </cars>
+Also available as [testdata/example.xml](testdata/example.xml).
+
+    <cars>
+    	<car vin="wp031" man="Volvo">
+    		<color>blue</color>
+    		<xs:doors>4</xs:doors>
+    		<engine nr="001">
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
+    	</car>
+    	<car vin="wp032" man="Volvo">
+    		<color>red</color>
+    		<xs:doors>2</xs:doors>
+    		<engine nr="002">
+    			<Fuel>Diesel</Fuel>
+    		</engine>
+    	</car>
+    	<car vin="wp033" man="Saab">
+    		<color>yellow</color>
+    		<xs:doors>4</xs:doors>
+    		<engine nr="003">
+    			<Fuel>Diesel</Fuel>
+    		</engine>
+    	</car>
+    	<info>&lt;some-xml>data&lt;/some-xml></info>
+    </cars>
 
 
 ### Queries
@@ -96,23 +98,23 @@ Command:
 
     Returns:
     <engine nr="001">
-      <Fuel>Gasoline</Fuel>
-    </engine>
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
     <engine nr="002">
-      <Fuel>Diesel</Fuel>
-    </engine>
+    			<Fuel>Diesel</Fuel>
+    		</engine>
     <engine nr="003">
-      <Fuel>Diesel</Fuel>
-    </engine>
+    			<Fuel>Diesel</Fuel>
+    		</engine>
 
 Command:
 
     saxer -l engine example.xml
 
     Returns:
-    <engine nr="001"> <Fuel>Gasoline</Fuel> </engine>
-    <engine nr="002"> <Fuel>Diesel</Fuel> </engine>
-    <engine nr="003"> <Fuel>Diesel</Fuel> </engine>
+    <engine nr="001"> 			<Fuel>Gasoline</Fuel> 		</engine>
+    <engine nr="002"> 			<Fuel>Diesel</Fuel> 		</engine>
+    <engine nr="003"> 			<Fuel>Diesel</Fuel> 		</engine>
 
 Command:
 
@@ -120,8 +122,8 @@ Command:
 
     Returns:
     <engine nr="001">
-        <Fuel>Gasoline</Fuel>
-      </engine>
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
 
 Command:
 
@@ -129,19 +131,19 @@ Command:
 
     Returns:
     <car vin="wp031" man="Volvo">
-      <color>blue</color>
-      <xs:doors>4</xs:doors>
-      <engine nr="001">
-        <Fuel>Gasoline</Fuel>
-      </engine>
-    </car>
+    		<color>blue</color>
+    		<xs:doors>4</xs:doors>
+    		<engine nr="001">
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
+    	</car>
     <car vin="wp032" man="Volvo">
-      <color>red</color>
-      <xs:doors>2</xs:doors>
-      <engine nr="002">
-        <Fuel>Diesel</Fuel>
-      </engine>
-    </car>
+    		<color>red</color>
+    		<xs:doors>2</xs:doors>
+    		<engine nr="002">
+    			<Fuel>Diesel</Fuel>
+    		</engine>
+    	</car>
 
 Command:
 
@@ -149,38 +151,37 @@ Command:
 
     Returns:
     <car vin="wp031" man="Volvo">
-      <color>blue</color>
-      <xs:doors>4</xs:doors>
-      <engine nr="001">
-        <Fuel>Gasoline</Fuel>
-      </engine>
-    </car>
+    		<color>blue</color>
+    		<xs:doors>4</xs:doors>
+    		<engine nr="001">
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
+    	</car>
 
 Command:
 
     saxer -i Fuel example.xml
 
     Returns:
-     Gasoline
-     Diesel
-     Diesel
+    Gasoline
+    Diesel
+    Diesel
 
 Command:
 
     saxer -n Fuel example.xml
 
     Returns:
-     3
-
+    3
 
 Command:
 
     saxer -m engine example.xml
 
     Returns:
-     5-7    cars/car/engine
-     12-14    cars/car/engine
-     19-21    cars/car/engine
+    5-7    cars/car/engine
+    12-14    cars/car/engine
+    19-21    cars/car/engine
 
 Command:
 
@@ -215,7 +216,6 @@ Command:
     <xs:doors>2</xs:doors>
     <xs:doors>4</xs:doors>
 
-
 Command:
 
     saxer -c or example.xml
@@ -234,7 +234,7 @@ Command:
 
     Returns:
     <saxer-result>
-      <Fuel>Gasoline</Fuel>
-      <Fuel>Diesel</Fuel>
-      <Fuel>Diesel</Fuel>
+    <Fuel>Gasoline</Fuel>
+    <Fuel>Diesel</Fuel>
+    <Fuel>Diesel</Fuel>
     </saxer-result>

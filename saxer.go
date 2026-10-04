@@ -58,7 +58,7 @@ func newRootCmd() *cobra.Command {
 			if len(args) == 2 {
 				filename = args[1]
 			}
-			return run(opts, filename)
+			return run(opts, filename, cmd.InOrStdin(), cmd.OutOrStdout())
 		},
 		SilenceUsage: true,
 	}
@@ -81,7 +81,7 @@ func newRootCmd() *cobra.Command {
 	return cmd
 }
 
-func run(opts *options, filename string) error {
+func run(opts *options, filename string, in io.Reader, out io.Writer) error {
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
 	//evince callgraph.pdf
 
@@ -93,7 +93,7 @@ func run(opts *options, filename string) error {
 		if err := pprof.StartCPUProfile(f); err != nil {
 			return err
 		}
-		fmt.Println("profiling!")
+		fmt.Fprintln(out, "profiling!")
 		defer pprof.StopCPUProfile()
 	}
 
@@ -107,40 +107,38 @@ func run(opts *options, filename string) error {
 			return fmt.Errorf("error opening file: %s", absFilename)
 		}
 		defer file.Close()
-		return SaxXmlInput(file, opts)
+		return SaxXmlInput(file, out, opts)
 	}
-	return SaxXmlInput(bufio.NewReader(os.Stdin), opts)
+	return SaxXmlInput(bufio.NewReader(in), out, opts)
 }
 
-func emitterMetaPrinter(emitter chan contentBuffer.EmitterData, wg *sync.WaitGroup) {
-	for {
-		ed := <-emitter
-		fmt.Printf("%d-%d    %s\n", ed.LineStart, ed.LineEnd, ed.NodePath)
+func emitterMetaPrinter(out io.Writer, emitter chan contentBuffer.EmitterData, wg *sync.WaitGroup) {
+	for ed := range emitter {
+		fmt.Fprintf(out, "%d-%d    %s\n", ed.LineStart, ed.LineEnd, ed.NodePath)
 		wg.Done()
 	}
 }
 
-func emitterPrinter(emitter chan string, wg *sync.WaitGroup, line bool, htmlEscape bool) {
+func emitterPrinter(out io.Writer, emitter chan string, wg *sync.WaitGroup, line bool, htmlEscape bool) {
 	r := strings.NewReplacer("&quot;", "\"",
 		"&apos;", "'",
 		"&lt;", "<",
 		"&gt;", ">",
 		"&amp;", "&")
-	for {
-		node := <-emitter
+	for node := range emitter {
 		if htmlEscape {
 			node = r.Replace(node)
 		}
 		if line {
-			fmt.Println(strings.Replace(node, "\n", " ", -1))
+			fmt.Fprintln(out, strings.ReplaceAll(node, "\n", " "))
 		} else {
-			fmt.Println(node)
+			fmt.Fprintln(out, node)
 		}
 		wg.Done()
 	}
 }
 
-func SaxXmlInput(reader io.Reader, opts *options) error {
+func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
 	var err error
 	var sr saxReader.SaxReader
 	sr = saxReader.NewSaxReaderNoEmitter()
@@ -156,7 +154,7 @@ func SaxXmlInput(reader io.Reader, opts *options) error {
 	sr.ContentBufferSize = opts.contentBuf * ONE_MB
 	sr.ElementBufferSize = opts.tagBuffer * ONE_KB
 	if opts.wrapResult {
-		fmt.Println("<saxer-result>")
+		fmt.Fprintln(out, "<saxer-result>")
 	}
 	if opts.count {
 		var counter uint64 = 0
@@ -166,12 +164,12 @@ func SaxXmlInput(reader io.Reader, opts *options) error {
 		}
 		sr.EmitterFn = emitterCounter
 		err = sr.Read(reader, &tm)
-		fmt.Println(counter)
+		fmt.Fprintln(out, counter)
 	} else if opts.meta {
 		counter := 0
 		elemChan := make(chan contentBuffer.EmitterData, 100)
 		var wg sync.WaitGroup
-		go emitterMetaPrinter(elemChan, &wg)
+		go emitterMetaPrinter(out, elemChan, &wg)
 		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
 			elemChan <- contentBuffer.EmitterData{Content: ed.Content, LineStart: ed.LineStart, LineEnd: ed.LineEnd, NodePath: ed.NodePath}
@@ -188,11 +186,12 @@ func SaxXmlInput(reader io.Reader, opts *options) error {
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, &tm)
 		wg.Wait()
+		close(elemChan)
 	} else {
 		counter := 0
 		elemChan := make(chan string, 100)
 		var wg sync.WaitGroup
-		go emitterPrinter(elemChan, &wg, opts.singleLine, opts.unescape)
+		go emitterPrinter(out, elemChan, &wg, opts.singleLine, opts.unescape)
 		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
 			elemChan <- ed.Content
@@ -209,9 +208,10 @@ func SaxXmlInput(reader io.Reader, opts *options) error {
 		sr.EmitterFn = emitter
 		err = sr.Read(reader, &tm)
 		wg.Wait()
+		close(elemChan)
 	}
 	if opts.wrapResult {
-		fmt.Println("</saxer-result>")
+		fmt.Fprintln(out, "</saxer-result>")
 	}
 	return err
 }

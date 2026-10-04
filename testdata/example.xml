@@ -1,0 +1,24 @@
+<cars>
+	<car vin="wp031" man="Volvo">
+		<color>blue</color>
+		<xs:doors>4</xs:doors>
+		<engine nr="001">
+			<Fuel>Gasoline</Fuel>
+		</engine>
+	</car>
+	<car vin="wp032" man="Volvo">
+		<color>red</color>
+		<xs:doors>2</xs:doors>
+		<engine nr="002">
+			<Fuel>Diesel</Fuel>
+		</engine>
+	</car>
+	<car vin="wp033" man="Saab">
+		<color>yellow</color>
+		<xs:doors>4</xs:doors>
+		<engine nr="003">
+			<Fuel>Diesel</Fuel>
+		</engine>
+	</car>
+	<info>&lt;some-xml>data&lt;/some-xml></info>
+</cars>
