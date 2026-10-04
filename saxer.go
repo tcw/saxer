@@ -8,18 +8,14 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 	"strings"
-	"sync"
 
 	"github.com/spf13/cobra"
-	"github.com/tcw/saxer/contentBuffer"
-	"github.com/tcw/saxer/saxReader"
-	"github.com/tcw/saxer/tagMatcher"
+	"github.com/tcw/saxer/contentbuffer"
+	"github.com/tcw/saxer/saxreader"
+	"github.com/tcw/saxer/tagmatcher"
 )
 
 const version = "0.0.7"
-
-const ONE_KB int = 1024
-const ONE_MB int = ONE_KB * ONE_KB
 
 type options struct {
 	query           string
@@ -82,29 +78,22 @@ func newRootCmd() *cobra.Command {
 }
 
 func run(opts *options, filename string, in io.Reader, out io.Writer) error {
-	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
-	//evince callgraph.pdf
-
 	if opts.cpuProfile {
-		f, err := os.Create("cpu.pprof")
+		stop, err := startCPUProfile("cpu.pprof")
 		if err != nil {
 			return err
 		}
-		if err := pprof.StartCPUProfile(f); err != nil {
-			return err
-		}
-		fmt.Fprintln(out, "profiling!")
-		defer pprof.StopCPUProfile()
+		defer stop()
 	}
 
 	if strings.TrimSpace(filename) != "" {
 		absFilename, err := filepath.Abs(filename)
 		if err != nil {
-			return fmt.Errorf("error finding file: %s", filename)
+			return fmt.Errorf("error finding file %s: %w", filename, err)
 		}
 		file, err := os.Open(absFilename)
 		if err != nil {
-			return fmt.Errorf("error opening file: %s", absFilename)
+			return fmt.Errorf("error opening file: %w", err)
 		}
 		defer file.Close()
 		return SaxXmlInput(file, out, opts)
@@ -112,106 +101,88 @@ func run(opts *options, filename string, in io.Reader, out io.Writer) error {
 	return SaxXmlInput(bufio.NewReader(in), out, opts)
 }
 
-func emitterMetaPrinter(out io.Writer, emitter chan contentBuffer.EmitterData, wg *sync.WaitGroup) {
-	for ed := range emitter {
-		fmt.Fprintf(out, "%d-%d    %s\n", ed.LineStart, ed.LineEnd, ed.NodePath)
-		wg.Done()
+// startCPUProfile writes a CPU profile to path until the returned stop
+// function is called. Inspect it with: go tool pprof --pdf saxer cpu.pprof
+func startCPUProfile(path string) (stop func(), err error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, err
 	}
+	if err := pprof.StartCPUProfile(f); err != nil {
+		f.Close()
+		return nil, err
+	}
+	fmt.Fprintln(os.Stderr, "profiling!")
+	return func() {
+		pprof.StopCPUProfile()
+		f.Close()
+	}, nil
 }
 
-func emitterPrinter(out io.Writer, emitter chan string, wg *sync.WaitGroup, line bool, htmlEscape bool) {
-	r := strings.NewReplacer("&quot;", "\"",
-		"&apos;", "'",
-		"&lt;", "<",
-		"&gt;", ">",
-		"&amp;", "&")
-	for node := range emitter {
-		if htmlEscape {
-			node = r.Replace(node)
+var htmlUnescaper = strings.NewReplacer(
+	"&quot;", "\"",
+	"&apos;", "'",
+	"&lt;", "<",
+	"&gt;", ">",
+	"&amp;", "&")
+
+// nodePrinter returns the function that writes one match to w, as
+// selected by the output flags.
+func nodePrinter(w io.Writer, opts *options) func(*contentbuffer.EmitterData) {
+	if opts.meta {
+		return func(ed *contentbuffer.EmitterData) {
+			fmt.Fprintf(w, "%d-%d    %s\n", ed.LineStart, ed.LineEnd, ed.NodePath)
 		}
-		if line {
-			fmt.Fprintln(out, strings.ReplaceAll(node, "\n", " "))
-		} else {
-			fmt.Fprintln(out, node)
+	}
+	return func(ed *contentbuffer.EmitterData) {
+		node := ed.Content
+		if opts.unescape {
+			node = htmlUnescaper.Replace(node)
 		}
-		wg.Done()
+		if opts.singleLine {
+			node = strings.ReplaceAll(node, "\n", " ")
+		}
+		fmt.Fprintln(w, node)
 	}
 }
 
 func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
-	var err error
-	var sr saxReader.SaxReader
-	sr = saxReader.NewSaxReaderNoEmitter()
-	tm := tagMatcher.NewTagMatcher(opts.query)
-	if opts.containMatch {
-		tm.EqualityFn = tagMatcher.EqFnContains
-	} else {
-		tm.EqualityFn = tagMatcher.EqFnEqulas
+	tm, err := tagmatcher.NewTagMatcher(opts.query, tagmatcher.Options{
+		Contains:        opts.containMatch,
+		CaseInsensitive: opts.caseInsensitive,
+		OmitNamespace:   opts.omitNamespace,
+	})
+	if err != nil {
+		return err
 	}
-	tm.CaseSensitive = !opts.caseInsensitive
-	tm.WithoutNamespace = opts.omitNamespace
+	sr := saxreader.New()
 	sr.IsInnerXml = opts.isInnerXml
-	sr.ContentBufferSize = opts.contentBuf * ONE_MB
-	sr.ElementBufferSize = opts.tagBuffer * ONE_KB
+	sr.ContentBufferSize = opts.contentBuf * saxreader.MB
+	sr.ElementBufferSize = opts.tagBuffer * saxreader.KB
+
+	w := bufio.NewWriter(out)
 	if opts.wrapResult {
-		fmt.Fprintln(out, "<saxer-result>")
+		fmt.Fprintln(w, "<saxer-result>")
 	}
+	var matches uint64
+	printNode := nodePrinter(w, opts)
+	sr.EmitterFn = func(ed *contentbuffer.EmitterData) bool {
+		matches++
+		if opts.count {
+			return false
+		}
+		printNode(ed)
+		return opts.firstN > 0 && matches >= uint64(opts.firstN)
+	}
+	err = sr.Read(reader, &tm)
 	if opts.count {
-		var counter uint64 = 0
-		emitterCounter := func(ed *contentBuffer.EmitterData) bool {
-			counter++
-			return false
-		}
-		sr.EmitterFn = emitterCounter
-		err = sr.Read(reader, &tm)
-		fmt.Fprintln(out, counter)
-	} else if opts.meta {
-		counter := 0
-		elemChan := make(chan contentBuffer.EmitterData, 100)
-		var wg sync.WaitGroup
-		go emitterMetaPrinter(out, elemChan, &wg)
-		emitter := func(ed *contentBuffer.EmitterData) bool {
-			wg.Add(1)
-			elemChan <- contentBuffer.EmitterData{Content: ed.Content, LineStart: ed.LineStart, LineEnd: ed.LineEnd, NodePath: ed.NodePath}
-			if opts.firstN > 0 {
-				counter++
-				if counter >= opts.firstN {
-					return true
-				} else {
-					return false
-				}
-			}
-			return false
-		}
-		sr.EmitterFn = emitter
-		err = sr.Read(reader, &tm)
-		wg.Wait()
-		close(elemChan)
-	} else {
-		counter := 0
-		elemChan := make(chan string, 100)
-		var wg sync.WaitGroup
-		go emitterPrinter(out, elemChan, &wg, opts.singleLine, opts.unescape)
-		emitter := func(ed *contentBuffer.EmitterData) bool {
-			wg.Add(1)
-			elemChan <- ed.Content
-			if opts.firstN > 0 {
-				counter++
-				if counter >= opts.firstN {
-					return true
-				} else {
-					return false
-				}
-			}
-			return false
-		}
-		sr.EmitterFn = emitter
-		err = sr.Read(reader, &tm)
-		wg.Wait()
-		close(elemChan)
+		fmt.Fprintln(w, matches)
 	}
 	if opts.wrapResult {
-		fmt.Fprintln(out, "</saxer-result>")
+		fmt.Fprintln(w, "</saxer-result>")
+	}
+	if flushErr := w.Flush(); err == nil {
+		err = flushErr
 	}
 	return err
 }

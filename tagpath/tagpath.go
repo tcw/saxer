@@ -1,4 +1,4 @@
-package tagPath
+package tagpath
 
 import (
 	"bytes"
@@ -62,12 +62,6 @@ func (tp *TagPath) NextTag() *Tag {
 	tag := &tp.Path[tp.PathPos]
 	tp.PathPos++
 	return tag
-}
-
-func (tg *Tag) NextAttribute() *Attribute {
-	attr := &tg.Attributes[tg.AttributePos]
-	tg.AttributePos++
-	return attr
 }
 
 func (t *Tag) AddAttribute(key string, value string) {

@@ -1,4 +1,4 @@
-package contentBuffer
+package contentbuffer
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -42,4 +42,14 @@ func TestAddArray(t *testing.T) {
 	cb.AddArray([]byte{'a', 'b', 'c'})
 	cb.Emit(emitterData)
 	assert.Equal(t, actual, "abc")
+}
+
+func TestAddFillsWholeBuffer(t *testing.T) {
+	cb := NewContentBuffer(3, emitterTestFn)
+	assert.NoError(t, cb.Add('a'))
+	assert.NoError(t, cb.AddArray([]byte{'b', 'c'}))
+	assert.ErrorIs(t, cb.Add('d'), ErrFull)
+	assert.ErrorIs(t, cb.AddArray([]byte{'d'}), ErrFull)
+	cb.Emit(emitterData)
+	assert.Equal(t, "abc", actual)
 }

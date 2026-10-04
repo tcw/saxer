@@ -1,9 +1,10 @@
-package contentBuffer
+package contentbuffer
 
 import "errors"
 
+var ErrFull = errors.New("content buffer is full, use --cont-buf to increase buffer")
+
 type ContentBuffer struct {
-	size      int
 	buf       []byte
 	pos       int
 	emitterFn func(*EmitterData) bool
@@ -24,8 +25,7 @@ func (ed *EmitterData) Reset() {
 }
 
 func NewContentBuffer(bufferSize int, emitter func(*EmitterData) bool) ContentBuffer {
-	i := make([]byte, bufferSize)
-	return ContentBuffer{size: bufferSize, buf: i, pos: 0, emitterFn: emitter}
+	return ContentBuffer{buf: make([]byte, bufferSize), emitterFn: emitter}
 }
 
 func (cb *ContentBuffer) Reset() {
@@ -33,8 +33,8 @@ func (cb *ContentBuffer) Reset() {
 }
 
 func (cb *ContentBuffer) Add(b byte) error {
-	if cb.size-1 <= cb.pos {
-		return errors.New("ContentBuffer is full, use --cont-buf to increase buffer!")
+	if cb.pos >= len(cb.buf) {
+		return ErrFull
 	}
 	cb.buf[cb.pos] = b
 	cb.pos++
@@ -42,16 +42,16 @@ func (cb *ContentBuffer) Add(b byte) error {
 }
 
 func (cb *ContentBuffer) AddArray(b []byte) error {
-	if cb.size-1 <= cb.pos+len(b) {
-		return errors.New("ContentBuffer is full, use --cont-buf to increase buffer!")
+	if cb.pos+len(b) > len(cb.buf) {
+		return ErrFull
 	}
 	copy(cb.buf[cb.pos:], b)
-	cb.pos = cb.pos + len(b)
+	cb.pos += len(b)
 	return nil
 }
 
 func (cb *ContentBuffer) Backup(step int) {
-	cb.pos = cb.pos - step
+	cb.pos -= step
 }
 
 func (cb *ContentBuffer) Emit(ed *EmitterData) bool {
