@@ -55,57 +55,49 @@ func TestAddTagWithSecondTagNameAttributeMatchesOnlyAttributeQuery(t *testing.T)
 }
 
 func TestMatchCaseInsensitive(t *testing.T) {
-	tm := newTagMatcher(t, "mediawiki")
-	tm.CaseSensitive = false
+	tm := newTagMatcherWith(t, "mediawiki", Options{CaseInsensitive: true})
 	tm.AddTag("mediaWiki")
 	assert.True(t, tm.MatchesPath())
 }
 
 func TestMatchCaseInsensitiveAttributeKey(t *testing.T) {
-	tm := newTagMatcher(t, "?id")
-	tm.CaseSensitive = false
+	tm := newTagMatcherWith(t, "?id", Options{CaseInsensitive: true})
 	tm.AddTag("mediaWiki Id=\"1234\"")
 	assert.True(t, tm.MatchesPath())
 }
 
 func TestMatchCaseInsensitiveAttributeValue(t *testing.T) {
-	tm := newTagMatcher(t, "?id=test")
-	tm.CaseSensitive = false
+	tm := newTagMatcherWith(t, "?id=test", Options{CaseInsensitive: true})
 	tm.AddTag("mediaWiki Id=\"Test\"")
 	assert.True(t, tm.MatchesPath())
 }
 
 func TestMatchCaseSensitiveAttributeValue(t *testing.T) {
-	tm := newTagMatcher(t, "?id=test")
-	tm.CaseSensitive = true
+	tm := newTagMatcherWith(t, "?id=test", Options{})
 	tm.AddTag("mediaWiki id=\"Test\"")
 	assert.False(t, tm.MatchesPath())
 }
 
 func TestNotMatchCaseSensitive(t *testing.T) {
-	tm := newTagMatcher(t, "mediawiki")
-	tm.CaseSensitive = true
+	tm := newTagMatcherWith(t, "mediawiki", Options{})
 	tm.AddTag("mediaWiki")
 	assert.False(t, tm.MatchesPath())
 }
 
 func TestMatchContain(t *testing.T) {
-	tm := newTagMatcher(t, "medi")
-	tm.EqualityFn = EqFnContains
+	tm := newTagMatcherWith(t, "medi", Options{Contains: true})
 	tm.AddTag("mediaWiki")
 	assert.True(t, tm.MatchesPath())
 }
 
 func TestNotMatchEquals(t *testing.T) {
-	tm := newTagMatcher(t, "medi")
-	tm.EqualityFn = EqFnEquals
+	tm := newTagMatcherWith(t, "medi", Options{})
 	tm.AddTag("mediaWiki")
 	assert.False(t, tm.MatchesPath())
 }
 
 func TestMatchContainAttributeValue(t *testing.T) {
-	tm := newTagMatcher(t, "?ref")
-	tm.EqualityFn = EqFnContains
+	tm := newTagMatcherWith(t, "?ref", Options{Contains: true})
 	tm.AddTag("mediaWiki referance=\"12345\"")
 	assert.True(t, tm.MatchesPath())
 }
@@ -140,12 +132,56 @@ func TestAddTagTooManyAttributes(t *testing.T) {
 
 func newTagMatcher(t *testing.T, query string) TagMatcher {
 	t.Helper()
-	tm, err := NewTagMatcher(query)
+	return newTagMatcherWith(t, query, Options{})
+}
+
+func newTagMatcherWith(t *testing.T, query string, opts Options) TagMatcher {
+	t.Helper()
+	tm, err := NewTagMatcher(query, opts)
 	require.NoError(t, err)
 	return tm
 }
 
 func TestNewTagMatcherRejectsInvalidQuery(t *testing.T) {
-	_, err := NewTagMatcher("a?b?c")
+	_, err := NewTagMatcher("a?b?c", Options{})
 	assert.Error(t, err)
+}
+
+func TestMatchOmitNamespace(t *testing.T) {
+	tm := newTagMatcherWith(t, "doors", Options{OmitNamespace: true})
+	tm.AddTag("xs:doors")
+	assert.True(t, tm.MatchesPath())
+}
+
+func TestMatchOmitNamespaceInQuery(t *testing.T) {
+	tm := newTagMatcherWith(t, "xs:doors", Options{OmitNamespace: true})
+	tm.AddTag("ys:doors")
+	assert.True(t, tm.MatchesPath())
+}
+
+func TestNotMatchNamespaceByDefault(t *testing.T) {
+	tm := newTagMatcher(t, "doors")
+	tm.AddTag("xs:doors")
+	assert.False(t, tm.MatchesPath())
+}
+
+func TestMatchCaseInsensitiveKeepsPathCase(t *testing.T) {
+	tm := newTagMatcherWith(t, "mediawiki", Options{CaseInsensitive: true})
+	tm.AddTag("MediaWiki")
+	assert.True(t, tm.MatchesPath())
+	assert.Equal(t, "MediaWiki", tm.GetCurrentPath())
+}
+
+// A query attribute matching several attributes of a tag must not make up
+// for another query attribute that matches none.
+func TestMatchContainsEveryQueryAttributeMustMatch(t *testing.T) {
+	tm := newTagMatcherWith(t, "?ab&zz", Options{Contains: true})
+	tm.AddTag(`a ab="1" abc="2"`)
+	assert.False(t, tm.MatchesPath())
+}
+
+func TestMatchContainsAttributeMatchingSeveral(t *testing.T) {
+	tm := newTagMatcherWith(t, "?ab", Options{Contains: true})
+	tm.AddTag(`a ab="1" abc="2"`)
+	assert.True(t, tm.MatchesPath())
 }

@@ -146,23 +146,12 @@ func nodePrinter(w io.Writer, opts *options) func(*contentbuffer.EmitterData) {
 	}
 }
 
-func newTagMatcher(opts *options) (tagmatcher.TagMatcher, error) {
-	tm, err := tagmatcher.NewTagMatcher(opts.query)
-	if err != nil {
-		return tm, err
-	}
-	if opts.containMatch {
-		tm.EqualityFn = tagmatcher.EqFnContains
-	} else {
-		tm.EqualityFn = tagmatcher.EqFnEquals
-	}
-	tm.CaseSensitive = !opts.caseInsensitive
-	tm.WithoutNamespace = opts.omitNamespace
-	return tm, nil
-}
-
 func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
-	tm, err := newTagMatcher(opts)
+	tm, err := tagmatcher.NewTagMatcher(opts.query, tagmatcher.Options{
+		Contains:        opts.containMatch,
+		CaseInsensitive: opts.caseInsensitive,
+		OmitNamespace:   opts.omitNamespace,
+	})
 	if err != nil {
 		return err
 	}

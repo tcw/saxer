@@ -314,7 +314,7 @@ func readAll(sr SaxReader, r io.Reader, query string) ([]string, error) {
 		got = append(got, ed.Content)
 		return false
 	}
-	tm, err := tagmatcher.NewTagMatcher(query)
+	tm, err := tagmatcher.NewTagMatcher(query, tagmatcher.Options{})
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +324,7 @@ func readAll(sr SaxReader, r io.Reader, query string) ([]string, error) {
 
 func newTagMatcher(t *testing.T, query string) tagmatcher.TagMatcher {
 	t.Helper()
-	tm, err := tagmatcher.NewTagMatcher(query)
+	tm, err := tagmatcher.NewTagMatcher(query, tagmatcher.Options{})
 	require.NoError(t, err)
 	return tm
 }
