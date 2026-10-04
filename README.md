@@ -14,28 +14,32 @@ This tool is currently in alpha state!
 
 ## Usage
 
-    usage: saxer [<flags>] <query> [<file>]
+    saxer [flags] <query> [file]
 
     Flags:
-          --help         Show context-sensitive help (also try --help-long and --help-man).
-      -i, --inner        Inner-xml of selected element (default false)
-      -n, --count        Number of matches (default false)
-      -m, --meta         Get query meta data - linenumbers and path of matches (default false)
-      -f, --firstN=0     First n matches (default (0 = all matches))
-      -u, --unescape     Unescape html escape tokens (&lt; &gt; ...)
-      -s, --case         Turn on case insensitivity
-      -o, --omit-ns      Omit namespace in tag-name matches
-      -c, --contains     Maching of tag-name and attributes is executed by contains (not equals)
-      -w, --wrap         Wrap result in Xml tag
-      -l, --single-line  Each node will have a single line (Changes line ending!)
-          --tag-buf=4    Size of element tag buffer in KB - tag size
-          --cont-buf=4   Size of content buffer in MB - returned elements size
-          --profile-cpu  Profile parser
-          --version      Show application version.
+      -i, --inner          Inner-xml of selected element
+      -n, --count          Number of matches
+      -m, --meta           Get query meta data - linenumbers and path of matches
+      -f, --firstN int     First n matches (0 = all matches)
+      -u, --unescape       Unescape html escape tokens (&lt; &gt; ...)
+      -s, --case           Turn on case insensitivity
+      -o, --omit-ns        Omit namespace in tag-name matches
+      -c, --contains       Matching of tag-name and attributes is executed by contains (not equals)
+      -w, --wrap           Wrap result in Xml tag
+      -l, --single-line    Each node will have a single line (Changes line ending!)
+          --tag-buf int    Size of element tag buffer in KB - tag size (default 4)
+          --cont-buf int   Size of content buffer in MB - returned elements size (default 4)
+          --profile-cpu    Profile parser
+      -h, --help           help for saxer
+      -v, --version        version for saxer
 
     Args:
       <query>   Sax query expression
-      [<file>]  xml-file
+      [file]    xml-file (reads from stdin when omitted)
+
+Reading from stdin:
+
+    cat example.xml | saxer car
 
 
 ## Example file (example.xml)
@@ -92,13 +96,13 @@ Command:
 
     Returns:
     <engine nr="001">
-      <fuel>Gasoline</fuel>
+      <Fuel>Gasoline</Fuel>
     </engine>
     <engine nr="002">
-      <fuel>Diesel</fuel>
+      <Fuel>Diesel</Fuel>
     </engine>
-    <engine nr="002">
-      <fuel>Diesel</fuel>
+    <engine nr="003">
+      <Fuel>Diesel</Fuel>
     </engine>
 
 Command:
@@ -106,9 +110,9 @@ Command:
     saxer -l engine example.xml
 
     Returns:
-    <engine nr="001"> <fuel>Gasoline</fuel> </engine>
-    <engine nr="002"> <fuel>Diesel</fuel> </engine>
-    <engine nr="002"> <fuel>Diesel</fuel> </engine>
+    <engine nr="001"> <Fuel>Gasoline</Fuel> </engine>
+    <engine nr="002"> <Fuel>Diesel</Fuel> </engine>
+    <engine nr="003"> <Fuel>Diesel</Fuel> </engine>
 
 Command:
 

@@ -3,74 +3,113 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/tcw/saxer/contentBuffer"
-	"github.com/tcw/saxer/saxReader"
-	"github.com/tcw/saxer/tagMatcher"
-	"gopkg.in/alecthomas/kingpin.v2"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
 	"strings"
 	"sync"
+
+	"github.com/spf13/cobra"
+	"github.com/tcw/saxer/contentBuffer"
+	"github.com/tcw/saxer/saxReader"
+	"github.com/tcw/saxer/tagMatcher"
 )
 
-var (
-	query         = kingpin.Arg("query", "Sax query expression").Required().String()
-	filename      = kingpin.Arg("file", "xml-file").String()
-	isInnerXml    = kingpin.Flag("inner", "Inner-xml of selected element (default false)").Short('i').Default("false").Bool()
-	count         = kingpin.Flag("count", "Number of matches (default false)").Short('n').Default("false").Bool()
-	meta          = kingpin.Flag("meta", "Get query meta data - linenumbers and path of matches (default false)").Short('m').Default("false").Bool()
-	firstN        = kingpin.Flag("firstN", "First n matches (default (0 = all matches))").Short('f').Default("0").Int()
-	unescape      = kingpin.Flag("unescape", "Unescape html escape tokens (&lt; &gt; ...)").Short('u').Default("false").Bool()
-	caseSesitive  = kingpin.Flag("case", "Turn on case insensitivity").Short('s').Default("false").Bool()
-	omitNamespace = kingpin.Flag("omit-ns", "Omit namespace in tag-name matches").Short('o').Default("false").Bool()
-	containMatch  = kingpin.Flag("contains", "Maching of tag-name and attributes is executed by contains (not equals)").Short('c').Default("false").Bool()
-	wrapResult    = kingpin.Flag("wrap", "Wrap result in Xml tag").Short('w').Default("false").Bool()
-	singleLine    = kingpin.Flag("single-line", "Each node will have a single line (Changes line ending!)").Short('l').Default("false").Bool()
-	tagBuffer     = kingpin.Flag("tag-buf", "Size of element tag buffer in KB - tag size").Default("4").Int()
-	contentBuf    = kingpin.Flag("cont-buf", "Size of content buffer in MB - returned elements size").Default("4").Int()
-	cpuProfile    = kingpin.Flag("profile-cpu", "Profile parser").Bool()
-)
+const version = "0.0.7"
 
 const ONE_KB int = 1024
 const ONE_MB int = ONE_KB * ONE_KB
 
-func main() {
-	kingpin.Version("0.0.7")
-	kingpin.Parse()
+type options struct {
+	query           string
+	isInnerXml      bool
+	count           bool
+	meta            bool
+	firstN          int
+	unescape        bool
+	caseInsensitive bool
+	omitNamespace   bool
+	containMatch    bool
+	wrapResult      bool
+	singleLine      bool
+	tagBuffer       int
+	contentBuf      int
+	cpuProfile      bool
+}
 
+func main() {
+	if err := newRootCmd().Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func newRootCmd() *cobra.Command {
+	opts := &options{}
+	cmd := &cobra.Command{
+		Use:     "saxer [flags] <query> [file]",
+		Short:   "Fast xml exploration tool for very large files",
+		Long:    "Saxer queries xml with a subset of xpath. Reads from file, or from stdin when no file is given.",
+		Version: version,
+		Args:    cobra.RangeArgs(1, 2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.query = args[0]
+			filename := ""
+			if len(args) == 2 {
+				filename = args[1]
+			}
+			return run(opts, filename)
+		},
+		SilenceUsage: true,
+	}
+
+	f := cmd.Flags()
+	f.SortFlags = false
+	f.BoolVarP(&opts.isInnerXml, "inner", "i", false, "Inner-xml of selected element")
+	f.BoolVarP(&opts.count, "count", "n", false, "Number of matches")
+	f.BoolVarP(&opts.meta, "meta", "m", false, "Get query meta data - linenumbers and path of matches")
+	f.IntVarP(&opts.firstN, "firstN", "f", 0, "First n matches (0 = all matches)")
+	f.BoolVarP(&opts.unescape, "unescape", "u", false, "Unescape html escape tokens (&lt; &gt; ...)")
+	f.BoolVarP(&opts.caseInsensitive, "case", "s", false, "Turn on case insensitivity")
+	f.BoolVarP(&opts.omitNamespace, "omit-ns", "o", false, "Omit namespace in tag-name matches")
+	f.BoolVarP(&opts.containMatch, "contains", "c", false, "Matching of tag-name and attributes is executed by contains (not equals)")
+	f.BoolVarP(&opts.wrapResult, "wrap", "w", false, "Wrap result in Xml tag")
+	f.BoolVarP(&opts.singleLine, "single-line", "l", false, "Each node will have a single line (Changes line ending!)")
+	f.IntVar(&opts.tagBuffer, "tag-buf", 4, "Size of element tag buffer in KB - tag size")
+	f.IntVar(&opts.contentBuf, "cont-buf", 4, "Size of content buffer in MB - returned elements size")
+	f.BoolVar(&opts.cpuProfile, "profile-cpu", false, "Profile parser")
+	return cmd
+}
+
+func run(opts *options, filename string) error {
 	//go tool pprof --pdf saxer cpu.pprof > callgraph.pdf
 	//evince callgraph.pdf
 
-	if *cpuProfile {
+	if opts.cpuProfile {
 		f, err := os.Create("cpu.pprof")
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
-		pprof.StartCPUProfile(f)
+		if err := pprof.StartCPUProfile(f); err != nil {
+			return err
+		}
 		fmt.Println("profiling!")
 		defer pprof.StopCPUProfile()
 	}
 
-	if strings.TrimSpace(*filename) != "" {
-		absFilename, err := filepath.Abs(*filename)
+	if strings.TrimSpace(filename) != "" {
+		absFilename, err := filepath.Abs(filename)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error finding file: %s\n", *filename)
-			os.Exit(1)
+			return fmt.Errorf("error finding file: %s", filename)
 		}
 		file, err := os.Open(absFilename)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error opening file: %s\n", absFilename)
-			os.Exit(1)
+			return fmt.Errorf("error opening file: %s", absFilename)
 		}
 		defer file.Close()
-		SaxXmlInput(file)
-	} else {
-		reader := bufio.NewReader(os.Stdin)
-		SaxXmlInput(reader)
+		return SaxXmlInput(file, opts)
 	}
+	return SaxXmlInput(bufio.NewReader(os.Stdin), opts)
 }
 
 func emitterMetaPrinter(emitter chan contentBuffer.EmitterData, wg *sync.WaitGroup) {
@@ -101,25 +140,25 @@ func emitterPrinter(emitter chan string, wg *sync.WaitGroup, line bool, htmlEsca
 	}
 }
 
-func SaxXmlInput(reader io.Reader) {
+func SaxXmlInput(reader io.Reader, opts *options) error {
 	var err error
 	var sr saxReader.SaxReader
 	sr = saxReader.NewSaxReaderNoEmitter()
-	tm := tagMatcher.NewTagMatcher(*query)
-	if *containMatch {
+	tm := tagMatcher.NewTagMatcher(opts.query)
+	if opts.containMatch {
 		tm.EqualityFn = tagMatcher.EqFnContains
 	} else {
 		tm.EqualityFn = tagMatcher.EqFnEqulas
 	}
-	tm.CaseSensitive = !*caseSesitive
-	tm.WithoutNamespace = *omitNamespace
-	sr.IsInnerXml = *isInnerXml
-	sr.ContentBufferSize = *contentBuf * ONE_MB
-	sr.ElementBufferSize = *tagBuffer * ONE_KB
-	if *wrapResult {
+	tm.CaseSensitive = !opts.caseInsensitive
+	tm.WithoutNamespace = opts.omitNamespace
+	sr.IsInnerXml = opts.isInnerXml
+	sr.ContentBufferSize = opts.contentBuf * ONE_MB
+	sr.ElementBufferSize = opts.tagBuffer * ONE_KB
+	if opts.wrapResult {
 		fmt.Println("<saxer-result>")
 	}
-	if *count {
+	if opts.count {
 		var counter uint64 = 0
 		emitterCounter := func(ed *contentBuffer.EmitterData) bool {
 			counter++
@@ -128,7 +167,7 @@ func SaxXmlInput(reader io.Reader) {
 		sr.EmitterFn = emitterCounter
 		err = sr.Read(reader, &tm)
 		fmt.Println(counter)
-	} else if *meta {
+	} else if opts.meta {
 		counter := 0
 		elemChan := make(chan contentBuffer.EmitterData, 100)
 		var wg sync.WaitGroup
@@ -136,9 +175,9 @@ func SaxXmlInput(reader io.Reader) {
 		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
 			elemChan <- contentBuffer.EmitterData{Content: ed.Content, LineStart: ed.LineStart, LineEnd: ed.LineEnd, NodePath: ed.NodePath}
-			if *firstN > 0 {
+			if opts.firstN > 0 {
 				counter++
-				if counter >= *firstN {
+				if counter >= opts.firstN {
 					return true
 				} else {
 					return false
@@ -153,13 +192,13 @@ func SaxXmlInput(reader io.Reader) {
 		counter := 0
 		elemChan := make(chan string, 100)
 		var wg sync.WaitGroup
-		go emitterPrinter(elemChan, &wg, *singleLine, *unescape)
+		go emitterPrinter(elemChan, &wg, opts.singleLine, opts.unescape)
 		emitter := func(ed *contentBuffer.EmitterData) bool {
 			wg.Add(1)
 			elemChan <- ed.Content
-			if *firstN > 0 {
+			if opts.firstN > 0 {
 				counter++
-				if counter >= *firstN {
+				if counter >= opts.firstN {
 					return true
 				} else {
 					return false
@@ -171,10 +210,8 @@ func SaxXmlInput(reader io.Reader) {
 		err = sr.Read(reader, &tm)
 		wg.Wait()
 	}
-	if *wrapResult {
+	if opts.wrapResult {
 		fmt.Println("</saxer-result>")
 	}
-	if err != nil {
-		panic(err)
-	}
+	return err
 }
