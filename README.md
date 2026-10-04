@@ -14,56 +14,62 @@ This tool is currently in alpha state!
 
 ## Usage
 
-    usage: saxer [<flags>] <query> [<file>]
+    saxer [flags] <query> [file]
 
     Flags:
-          --help         Show context-sensitive help (also try --help-long and --help-man).
-      -i, --inner        Inner-xml of selected element (default false)
-      -n, --count        Number of matches (default false)
-      -m, --meta         Get query meta data - linenumbers and path of matches (default false)
-      -f, --firstN=0     First n matches (default (0 = all matches))
-      -u, --unescape     Unescape html escape tokens (&lt; &gt; ...)
-      -s, --case         Turn on case insensitivity
-      -o, --omit-ns      Omit namespace in tag-name matches
-      -c, --contains     Maching of tag-name and attributes is executed by contains (not equals)
-      -w, --wrap         Wrap result in Xml tag
-      -l, --single-line  Each node will have a single line (Changes line ending!)
-          --tag-buf=4    Size of element tag buffer in KB - tag size
-          --cont-buf=4   Size of content buffer in MB - returned elements size
-          --profile-cpu  Profile parser
-          --version      Show application version.
+      -i, --inner          Inner-xml of selected element
+      -n, --count          Number of matches
+      -m, --meta           Get query meta data - linenumbers and path of matches
+      -f, --firstN int     First n matches (0 = all matches)
+      -u, --unescape       Unescape html escape tokens (&lt; &gt; ...)
+      -s, --case           Turn on case insensitivity
+      -o, --omit-ns        Omit namespace in tag-name matches
+      -c, --contains       Matching of tag-name and attributes is executed by contains (not equals)
+      -w, --wrap           Wrap result in Xml tag
+      -l, --single-line    Each node will have a single line (Changes line ending!)
+          --tag-buf int    Size of element tag buffer in KB - tag size (default 4)
+          --cont-buf int   Size of content buffer in MB - returned elements size (default 4)
+          --profile-cpu    Profile parser
+      -h, --help           help for saxer
+      -v, --version        version for saxer
 
     Args:
       <query>   Sax query expression
-      [<file>]  xml-file
+      [file]    xml-file (reads from stdin when omitted)
+
+Reading from stdin:
+
+    cat example.xml | saxer car
 
 
-##Example file (example.xml)
+## Example file (example.xml)
 
-      <cars>
-       	<car vin="wp031" man="Volvo">
-       		<color>blue</color>
-       		<xs:doors>4</xs:doors>
-       		<engine nr="001">
-       			<Fuel>Gasoline</Fuel>
-       		</engine>
-       	</car>
-       	<car vin="wp032" man="Volvo">
-       		<color>red</color>
-       		<xs:doors>2</xs:doors>
-       		<engine nr="002">
-       			<Fuel>Diesel</Fuel>
-       		</engine>
-       	</car>
-       	<car vin="wp033" man="Saab">
-       		<color>yellow</color>
-       		<xs:doors>4</xs:doors>
-       		<engine nr="003">
-       			<Fuel>Diesel</Fuel>
-       		</engine>
-       	</car>
-       	<info>&lt;some-xml>data&lt;/some-xml></info>
-      </cars>
+Also available as [testdata/example.xml](testdata/example.xml).
+
+    <cars>
+    	<car vin="wp031" man="Volvo">
+    		<color>blue</color>
+    		<xs:doors>4</xs:doors>
+    		<engine nr="001">
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
+    	</car>
+    	<car vin="wp032" man="Volvo">
+    		<color>red</color>
+    		<xs:doors>2</xs:doors>
+    		<engine nr="002">
+    			<Fuel>Diesel</Fuel>
+    		</engine>
+    	</car>
+    	<car vin="wp033" man="Saab">
+    		<color>yellow</color>
+    		<xs:doors>4</xs:doors>
+    		<engine nr="003">
+    			<Fuel>Diesel</Fuel>
+    		</engine>
+    	</car>
+    	<info>&lt;some-xml>data&lt;/some-xml></info>
+    </cars>
 
 
 ### Queries
@@ -92,23 +98,23 @@ Command:
 
     Returns:
     <engine nr="001">
-      <fuel>Gasoline</fuel>
-    </engine>
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
     <engine nr="002">
-      <fuel>Diesel</fuel>
-    </engine>
-    <engine nr="002">
-      <fuel>Diesel</fuel>
-    </engine>
+    			<Fuel>Diesel</Fuel>
+    		</engine>
+    <engine nr="003">
+    			<Fuel>Diesel</Fuel>
+    		</engine>
 
 Command:
 
     saxer -l engine example.xml
 
     Returns:
-    <engine nr="001"> <fuel>Gasoline</fuel> </engine>
-    <engine nr="002"> <fuel>Diesel</fuel> </engine>
-    <engine nr="002"> <fuel>Diesel</fuel> </engine>
+    <engine nr="001"> 			<Fuel>Gasoline</Fuel> 		</engine>
+    <engine nr="002"> 			<Fuel>Diesel</Fuel> 		</engine>
+    <engine nr="003"> 			<Fuel>Diesel</Fuel> 		</engine>
 
 Command:
 
@@ -116,8 +122,8 @@ Command:
 
     Returns:
     <engine nr="001">
-        <Fuel>Gasoline</Fuel>
-      </engine>
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
 
 Command:
 
@@ -125,19 +131,19 @@ Command:
 
     Returns:
     <car vin="wp031" man="Volvo">
-      <color>blue</color>
-      <xs:doors>4</xs:doors>
-      <engine nr="001">
-        <Fuel>Gasoline</Fuel>
-      </engine>
-    </car>
+    		<color>blue</color>
+    		<xs:doors>4</xs:doors>
+    		<engine nr="001">
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
+    	</car>
     <car vin="wp032" man="Volvo">
-      <color>red</color>
-      <xs:doors>2</xs:doors>
-      <engine nr="002">
-        <Fuel>Diesel</Fuel>
-      </engine>
-    </car>
+    		<color>red</color>
+    		<xs:doors>2</xs:doors>
+    		<engine nr="002">
+    			<Fuel>Diesel</Fuel>
+    		</engine>
+    	</car>
 
 Command:
 
@@ -145,38 +151,37 @@ Command:
 
     Returns:
     <car vin="wp031" man="Volvo">
-      <color>blue</color>
-      <xs:doors>4</xs:doors>
-      <engine nr="001">
-        <Fuel>Gasoline</Fuel>
-      </engine>
-    </car>
+    		<color>blue</color>
+    		<xs:doors>4</xs:doors>
+    		<engine nr="001">
+    			<Fuel>Gasoline</Fuel>
+    		</engine>
+    	</car>
 
 Command:
 
     saxer -i Fuel example.xml
 
     Returns:
-     Gasoline
-     Diesel
-     Diesel
+    Gasoline
+    Diesel
+    Diesel
 
 Command:
 
     saxer -n Fuel example.xml
 
     Returns:
-     3
-
+    3
 
 Command:
 
     saxer -m engine example.xml
 
     Returns:
-     5-7    cars/car/engine
-     12-14    cars/car/engine
-     19-21    cars/car/engine
+    5-7    cars/car/engine
+    12-14    cars/car/engine
+    19-21    cars/car/engine
 
 Command:
 
@@ -211,7 +216,6 @@ Command:
     <xs:doors>2</xs:doors>
     <xs:doors>4</xs:doors>
 
-
 Command:
 
     saxer -c or example.xml
@@ -230,7 +234,7 @@ Command:
 
     Returns:
     <saxer-result>
-      <Fuel>Gasoline</Fuel>
-      <Fuel>Diesel</Fuel>
-      <Fuel>Diesel</Fuel>
+    <Fuel>Gasoline</Fuel>
+    <Fuel>Diesel</Fuel>
+    <Fuel>Diesel</Fuel>
     </saxer-result>

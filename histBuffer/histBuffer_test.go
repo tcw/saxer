@@ -1,7 +1,8 @@
 package histBuffer
+
 import (
-	"testing"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestGetLast2(t *testing.T) {
@@ -11,7 +12,7 @@ func TestGetLast2(t *testing.T) {
 	hb.Add(byte('c'))
 	hb.Add(byte('d'))
 	last := hb.GetLast(2)
-	assert.Equal(t,last,[]byte{'c','d'})
+	assert.Equal(t, last, []byte{'c', 'd'})
 }
 
 func TestGetLastSwich(t *testing.T) {
@@ -21,7 +22,7 @@ func TestGetLastSwich(t *testing.T) {
 	hb.Add(byte('c'))
 	hb.Add(byte('d'))
 	last := hb.GetLast(2)
-	assert.Equal(t,last,[]byte{'c','d'})
+	assert.Equal(t, last, []byte{'c', 'd'})
 }
 
 func TestGetLastOnZeroPos(t *testing.T) {
@@ -30,7 +31,7 @@ func TestGetLastOnZeroPos(t *testing.T) {
 	hb.Add(byte('b'))
 	hb.Add(byte('c'))
 	last := hb.GetLast(2)
-	assert.Equal(t,last,[]byte{'b','c'})
+	assert.Equal(t, last, []byte{'b', 'c'})
 }
 
 func TestHasLast(t *testing.T) {
@@ -38,7 +39,7 @@ func TestHasLast(t *testing.T) {
 	hb.Add(byte('a'))
 	hb.Add(byte('b'))
 	last := hb.HasLast([]byte{'b'})
-	assert.True(t,last)
+	assert.True(t, last)
 }
 
 func TestHasLast2(t *testing.T) {
@@ -46,8 +47,8 @@ func TestHasLast2(t *testing.T) {
 	hb.Add(byte('a'))
 	hb.Add(byte('b'))
 	hb.Add(byte('c'))
-	last := hb.HasLast([]byte{'b','c'})
-	assert.True(t,last)
+	last := hb.HasLast([]byte{'b', 'c'})
+	assert.True(t, last)
 }
 
 func BenchmarkAdd(b *testing.B) {
@@ -59,7 +60,7 @@ func BenchmarkAdd(b *testing.B) {
 
 func BenchmarkGetLast(b *testing.B) {
 	hb := NewHistoryBuffer(4096)
-	for i := 0; i < 4096; i++  {
+	for i := 0; i < 4096; i++ {
 		hb.Add(byte('a'))
 	}
 	for i := 0; i < b.N; i++ {

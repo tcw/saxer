@@ -3,9 +3,9 @@ package saxReader
 import (
 	"bytes"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"github.com/tcw/saxer/contentBuffer"
 	"github.com/tcw/saxer/tagMatcher"
-	"github.com/zacg/testify/assert"
 	"testing"
 )
 

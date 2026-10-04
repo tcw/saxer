@@ -1,9 +1,9 @@
 package tagMatcher
+
 import (
-	"strings"
-	"github.com/tcw/saxer/tagPath"
 	"github.com/tcw/saxer/queryParser"
-	"github.com/google/gxui/math"
+	"github.com/tcw/saxer/tagPath"
+	"strings"
 )
 
 type TagMatcher struct {
@@ -34,7 +34,7 @@ func NewTagMatcher(queryString string) TagMatcher {
 	q := queryParser.Parse(queryString)
 	qHasAttributes := false
 	qHasPath := false
-	tAttr := make([]int, 1024 * 4)
+	tAttr := make([]int, 1024*4)
 	for i := 0; i < q.PathPos; i++ {
 		if q.Path[i].AttributePos > 0 {
 			qHasAttributes = true
@@ -44,24 +44,23 @@ func NewTagMatcher(queryString string) TagMatcher {
 		}
 	}
 
-	return TagMatcher{query:*q, queryHasAttributes:qHasAttributes,
-		queryHasPath:qHasPath,
-		path: *path,
-		lastMatchPath:last,
-		lastMatchPos:0,
-		tmpAttr:tAttr,
-		tmpAttrPos:0,
-		EqualityFn:EqFnEqulas,
-		CaseSensitive:true,
-		WithoutNamespace:false}
+	return TagMatcher{query: *q, queryHasAttributes: qHasAttributes,
+		queryHasPath:     qHasPath,
+		path:             *path,
+		lastMatchPath:    last,
+		lastMatchPos:     0,
+		tmpAttr:          tAttr,
+		tmpAttrPos:       0,
+		EqualityFn:       EqFnEqulas,
+		CaseSensitive:    true,
+		WithoutNamespace: false}
 }
 
-func (tm *TagMatcher)GetCurrentPath() string {
+func (tm *TagMatcher) GetCurrentPath() string {
 	return tm.path.GetCurrentPath()
 }
 
-
-func (tm *TagMatcher)AddTag(tagText string) {
+func (tm *TagMatcher) AddTag(tagText string) {
 	tagNameEnd := 0
 	insideAttrValue := false
 	insideAttrKey := false
@@ -70,7 +69,7 @@ func (tm *TagMatcher)AddTag(tagText string) {
 	tm.tmpAttrPos = 0
 	var separator rune = 0
 	cleanedTag := tagText
-	if strings.HasSuffix(tagText,"/"){
+	if strings.HasSuffix(tagText, "/") {
 		cleanedTag = strings.TrimRight(tagText, "/")
 	}
 	trimmed := strings.TrimSpace(cleanedTag)
@@ -80,24 +79,24 @@ func (tm *TagMatcher)AddTag(tagText string) {
 				tagNameEnd = key
 			}
 			readSpace = true
-		}else if value == rune('=') && !insideAttrValue {
+		} else if value == rune('=') && !insideAttrValue {
 			readEquals = true
 			tm.tmpAttr[tm.tmpAttrPos] = key
 			tm.tmpAttrPos++
-		}else if readEquals && !insideAttrValue && (value == rune('\'') || value == rune('"')) {
+		} else if readEquals && !insideAttrValue && (value == rune('\'') || value == rune('"')) {
 			separator = value
 			insideAttrValue = true
 			insideAttrKey = false
 			readEquals = false
 			tm.tmpAttr[tm.tmpAttrPos] = key + 1
 			tm.tmpAttrPos++
-		}else if readSpace && !insideAttrValue {
+		} else if readSpace && !insideAttrValue {
 			if !insideAttrKey {
 				tm.tmpAttr[tm.tmpAttrPos] = key
 				tm.tmpAttrPos++
 			}
 			insideAttrKey = true
-		}else if value == separator && insideAttrValue {
+		} else if value == separator && insideAttrValue {
 			separator = 0
 			insideAttrValue = false
 			tm.tmpAttr[tm.tmpAttrPos] = key
@@ -107,19 +106,19 @@ func (tm *TagMatcher)AddTag(tagText string) {
 	tag := tm.path.NextTag()
 	if tm.tmpAttrPos == 0 {
 		tag.Name = strings.TrimSpace(tagText)
-	}else {
+	} else {
 		tag.Name = tagText[:tagNameEnd]
 	}
-	if math.Mod(tm.tmpAttrPos, 4) == 0 {
+	if tm.tmpAttrPos%4 == 0 {
 		for i := 0; i < tm.tmpAttrPos; i = i + 4 {
-			tag.AddAttribute(strings.TrimSpace(tagText[tm.tmpAttr[i]:tm.tmpAttr[i + 1]]), tagText[tm.tmpAttr[i + 2]:tm.tmpAttr[i + 3]])
+			tag.AddAttribute(strings.TrimSpace(tagText[tm.tmpAttr[i]:tm.tmpAttr[i+1]]), tagText[tm.tmpAttr[i+2]:tm.tmpAttr[i+3]])
 		}
-	}else {
+	} else {
 		panic("Parser tag attribute error")
 	}
 }
 
-func (np *TagMatcher)RemoveLast() {
+func (np *TagMatcher) RemoveLast() {
 	np.path.RemoveLast()
 }
 
@@ -130,7 +129,7 @@ func (tm *TagMatcher) TagNameMatchesLastMatch() bool {
 				return false
 			}
 		}
-	}else {
+	} else {
 		return false
 	}
 	return true
@@ -148,10 +147,10 @@ func (tm *TagMatcher) MatchesPath() bool {
 				var pathTagName string
 				if tm.CaseSensitive {
 					queryTagName = tm.query.Path[i].Name // TODO Could be done once at init
-					pathTagName = tm.path.Path[i + delta].Name
-				}else {
+					pathTagName = tm.path.Path[i+delta].Name
+				} else {
 					queryTagName = strings.ToLower(tm.query.Path[i].Name) // TODO Could be done once at init
-					pathTagName = strings.ToLower(tm.path.Path[i + delta].Name)
+					pathTagName = strings.ToLower(tm.path.Path[i+delta].Name)
 				}
 				if tm.WithoutNamespace {
 					tagNameParts := strings.Split(pathTagName, ":")
@@ -161,7 +160,7 @@ func (tm *TagMatcher) MatchesPath() bool {
 					if !tm.EqualityFn(queryTagName, pathTagName) {
 						return false
 					}
-				}else {
+				} else {
 					if !tm.EqualityFn(queryTagName, pathTagName) {
 						return false
 					}
@@ -169,7 +168,7 @@ func (tm *TagMatcher) MatchesPath() bool {
 			}
 
 			queryAttr := tm.query.Path[i].Attributes
-			pathAttr := tm.path.Path[i + delta].Attributes
+			pathAttr := tm.path.Path[i+delta].Attributes
 			if !tm.CaseSensitive {
 				toLowerCaseInPlace(queryAttr)
 				toLowerCaseInPlace(pathAttr)
@@ -177,7 +176,7 @@ func (tm *TagMatcher) MatchesPath() bool {
 
 			expectedMatches = tm.query.Path[i].AttributePos
 			for j := 0; j < tm.query.Path[i].AttributePos; j++ { //TODO O(n^2) now, could be O(n(n − 1)/2)
-				for g := 0; g < tm.path.Path[i + delta].AttributePos; g++ {
+				for g := 0; g < tm.path.Path[i+delta].AttributePos; g++ {
 					if tm.EqualityFn(queryAttr[j].Key, pathAttr[g].Key) {
 						if len(queryAttr[j].Value) == 0 || tm.EqualityFn(queryAttr[j].Value, pathAttr[g].Value) {
 							actualMatches++
@@ -197,7 +196,7 @@ func (tm *TagMatcher) MatchesPath() bool {
 			tm.lastMatchPath[i] = tm.path.Path[i].Name
 		}
 		return true
-	}else {
+	} else {
 		return false
 	}
 }
@@ -209,5 +208,3 @@ func toLowerCaseInPlace(elems []tagPath.Attribute) {
 	}
 
 }
-
-

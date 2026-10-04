@@ -9,7 +9,7 @@ type TagBuffer struct {
 }
 
 func NewTagBuffer(bufferSize int) TagBuffer {
-	return TagBuffer{buffer: make([]byte, bufferSize), Position: 0, LocalStart:-1, LocalEnd:-1, StartTags:0}
+	return TagBuffer{buffer: make([]byte, bufferSize), Position: 0, LocalStart: -1, LocalEnd: -1, StartTags: 0}
 }
 
 func (eb *TagBuffer) ResetLocalState() {

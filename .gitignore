@@ -27,3 +27,7 @@ _testmain.go
 
 .idea/
 saxer.iml
+
+# Build output and profiles
+/saxer
+cpu.pprof

@@ -1,4 +1,5 @@
 package tagPath
+
 import (
 	"bytes"
 )
@@ -24,14 +25,14 @@ func (tp *TagPath) GetCurrentPath() string {
 	var buffer bytes.Buffer
 	for key, value := range pathSlice {
 		buffer.WriteString(value.Name)
-		if key != len(pathSlice) - 1 {
+		if key != len(pathSlice)-1 {
 			buffer.WriteString("/")
 		}
 	}
 	return buffer.String()
 }
 
-//Constructing structs up front and reusing them for zero gc
+// Constructing structs up front and reusing them for zero gc
 func NewTagPath() *TagPath {
 	tp := &TagPath{make([]Tag, 100), 0}
 	for i := 0; i < len(tp.Path); i++ {
