@@ -1,6 +1,8 @@
 package tagMatcher
 
 import (
+	"fmt"
+
 	"github.com/tcw/saxer/queryParser"
 	"github.com/tcw/saxer/tagPath"
 	"strings"
@@ -60,7 +62,7 @@ func (tm *TagMatcher) GetCurrentPath() string {
 	return tm.path.GetCurrentPath()
 }
 
-func (tm *TagMatcher) AddTag(tagText string) {
+func (tm *TagMatcher) AddTag(tagText string) error {
 	tagNameEnd := 0
 	insideAttrValue := false
 	insideAttrKey := false
@@ -74,7 +76,10 @@ func (tm *TagMatcher) AddTag(tagText string) {
 	}
 	trimmed := strings.TrimSpace(cleanedTag)
 	for key, value := range trimmed {
-		if value == rune(' ') && !insideAttrValue {
+		if tm.tmpAttrPos >= 4*tagPath.MaxAttributes {
+			return fmt.Errorf("more than %d attributes in tag <%s>", tagPath.MaxAttributes, tagText)
+		}
+		if isSpace(value) && !insideAttrValue {
 			if tagNameEnd == 0 {
 				tagNameEnd = key
 			}
@@ -103,19 +108,26 @@ func (tm *TagMatcher) AddTag(tagText string) {
 			tm.tmpAttrPos++
 		}
 	}
+	if tm.path.PathPos >= tagPath.MaxDepth {
+		return fmt.Errorf("elements nested deeper than %d levels are not supported", tagPath.MaxDepth)
+	}
 	tag := tm.path.NextTag()
 	if tm.tmpAttrPos == 0 {
 		tag.Name = strings.TrimSpace(tagText)
 	} else {
 		tag.Name = tagText[:tagNameEnd]
 	}
-	if tm.tmpAttrPos%4 == 0 {
-		for i := 0; i < tm.tmpAttrPos; i = i + 4 {
-			tag.AddAttribute(strings.TrimSpace(tagText[tm.tmpAttr[i]:tm.tmpAttr[i+1]]), tagText[tm.tmpAttr[i+2]:tm.tmpAttr[i+3]])
-		}
-	} else {
-		panic("Parser tag attribute error")
+	if tm.tmpAttrPos%4 != 0 {
+		return fmt.Errorf("malformed attributes in tag <%s>", tagText)
 	}
+	for i := 0; i < tm.tmpAttrPos; i = i + 4 {
+		tag.AddAttribute(strings.TrimSpace(tagText[tm.tmpAttr[i]:tm.tmpAttr[i+1]]), tagText[tm.tmpAttr[i+2]:tm.tmpAttr[i+3]])
+	}
+	return nil
+}
+
+func isSpace(r rune) bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 }
 
 func (np *TagMatcher) RemoveLast() {

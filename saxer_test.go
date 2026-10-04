@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"regexp"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -140,6 +142,26 @@ func TestReadmeStdin(t *testing.T) {
 	got, err := runSaxer(t, f, "car")
 	require.NoError(t, err)
 	assert.Equal(t, lines(car1, car2, car3), got)
+}
+
+// A pipe can return fewer bytes than asked for; that must not change the output.
+func TestStdinShortReads(t *testing.T) {
+	data, err := os.ReadFile(exampleFile)
+	require.NoError(t, err)
+
+	got, err := runSaxer(t, iotest.OneByteReader(bytes.NewReader(data)), "car")
+	require.NoError(t, err)
+	assert.Equal(t, lines(car1, car2, car3), got)
+}
+
+func TestReadErrorIsReported(t *testing.T) {
+	_, err := runSaxer(t, iotest.ErrReader(errors.New("disk on fire")), "car")
+	assert.ErrorContains(t, err, "disk on fire")
+}
+
+func TestMissingFileIsReported(t *testing.T) {
+	_, err := runSaxer(t, nil, "car", "testdata/does-not-exist.xml")
+	assert.ErrorContains(t, err, "does-not-exist.xml")
 }
 
 // Keeps README.md honest: the example file it shows must be testdata/example.xml,
