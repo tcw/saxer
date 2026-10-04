@@ -22,7 +22,7 @@ type TagMatcher struct {
 	WithoutNamespace   bool
 }
 
-var EqFnEqulas = func(query string, source string) bool {
+var EqFnEquals = func(query string, source string) bool {
 	return query == source
 }
 
@@ -53,7 +53,7 @@ func NewTagMatcher(queryString string) TagMatcher {
 		lastMatchPos:     0,
 		tmpAttr:          tAttr,
 		tmpAttrPos:       0,
-		EqualityFn:       EqFnEqulas,
+		EqualityFn:       EqFnEquals,
 		CaseSensitive:    true,
 		WithoutNamespace: false}
 }

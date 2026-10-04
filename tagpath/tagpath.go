@@ -64,12 +64,6 @@ func (tp *TagPath) NextTag() *Tag {
 	return tag
 }
 
-func (tg *Tag) NextAttribute() *Attribute {
-	attr := &tg.Attributes[tg.AttributePos]
-	tg.AttributePos++
-	return attr
-}
-
 func (t *Tag) AddAttribute(key string, value string) {
 	t.Attributes[t.AttributePos].Key = key
 	t.Attributes[t.AttributePos].Value = value

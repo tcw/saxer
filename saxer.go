@@ -18,9 +18,6 @@ import (
 
 const version = "0.0.7"
 
-const ONE_KB int = 1024
-const ONE_MB int = ONE_KB * ONE_KB
-
 type options struct {
 	query           string
 	isInnerXml      bool
@@ -100,11 +97,11 @@ func run(opts *options, filename string, in io.Reader, out io.Writer) error {
 	if strings.TrimSpace(filename) != "" {
 		absFilename, err := filepath.Abs(filename)
 		if err != nil {
-			return fmt.Errorf("error finding file: %s", filename)
+			return fmt.Errorf("error finding file %s: %w", filename, err)
 		}
 		file, err := os.Open(absFilename)
 		if err != nil {
-			return fmt.Errorf("error opening file: %s", absFilename)
+			return fmt.Errorf("error opening file: %w", err)
 		}
 		defer file.Close()
 		return SaxXmlInput(file, out, opts)
@@ -146,13 +143,13 @@ func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
 	if opts.containMatch {
 		tm.EqualityFn = tagmatcher.EqFnContains
 	} else {
-		tm.EqualityFn = tagmatcher.EqFnEqulas
+		tm.EqualityFn = tagmatcher.EqFnEquals
 	}
 	tm.CaseSensitive = !opts.caseInsensitive
 	tm.WithoutNamespace = opts.omitNamespace
 	sr.IsInnerXml = opts.isInnerXml
-	sr.ContentBufferSize = opts.contentBuf * ONE_MB
-	sr.ElementBufferSize = opts.tagBuffer * ONE_KB
+	sr.ContentBufferSize = opts.contentBuf * saxreader.MB
+	sr.ElementBufferSize = opts.tagBuffer * saxreader.KB
 	if opts.wrapResult {
 		fmt.Fprintln(out, "<saxer-result>")
 	}

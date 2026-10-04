@@ -1,12 +1,12 @@
 package saxreader
 
 import (
+	"errors"
 	"fmt"
-	"github.com/tcw/saxer/contentbuffer"
-	"github.com/tcw/saxer/histbuffer"
 	"io"
 
-	"errors"
+	"github.com/tcw/saxer/contentbuffer"
+	"github.com/tcw/saxer/histbuffer"
 	"github.com/tcw/saxer/tagbuffer"
 	"github.com/tcw/saxer/tagmatcher"
 )
@@ -20,14 +20,17 @@ type SaxReader struct {
 	IsInnerXml        bool
 }
 
-const ONE_KB int = 1024
-const ONE_MB int = ONE_KB * ONE_KB
+// Byte size units for the buffer sizes.
+const (
+	KB = 1024
+	MB = 1024 * KB
+)
 
 func NewSaxReaderNoEmitter() SaxReader {
 
-	return SaxReader{ElementBufferSize: ONE_KB * 4,
-		ContentBufferSize: ONE_MB * 4,
-		ReaderBufferSize:  ONE_KB * 4,
+	return SaxReader{ElementBufferSize: KB * 4,
+		ContentBufferSize: MB * 4,
+		ReaderBufferSize:  KB * 4,
 		PathDepthSize:     1000,
 		EmitterFn:         nil,
 		IsInnerXml:        false}
@@ -54,14 +57,14 @@ var escapeNames = map[int]string{
 
 func (sr *SaxReader) Read(reader io.Reader, tm *tagmatcher.TagMatcher) error {
 	tb := tagbuffer.NewTagBuffer(sr.ElementBufferSize)
-	history := histbuffer.NewHistoryBuffer(ONE_KB * 4)
+	history := histbuffer.NewHistoryBuffer(KB * 4)
 	contentBuf := contentbuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
 	buffer := make([]byte, sr.ReaderBufferSize)
 	emitterData := &contentbuffer.EmitterData{}
 	escape := escapeNone
 	var quote byte = 0    // quote char of the attribute value being read, inside tags and declarations
 	declarationDepth := 0 // nesting of [ ] in a declaration (DOCTYPE internal subset)
-	isRecoding := false
+	isRecording := false
 	stop := false
 	var err error
 	var lineNumber uint64 = 0
@@ -71,7 +74,7 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagmatcher.TagMatcher) error {
 		tb.ResetLocalState()
 		for index := 0; index < n; index++ {
 			value := buffer[index]
-			if isRecoding {
+			if isRecording {
 				bufferFullErr := contentBuf.Add(value)
 				if bufferFullErr != nil {
 					return bufferFullErr
@@ -137,7 +140,7 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagmatcher.TagMatcher) error {
 			}
 			if value == byte('<') {
 				if inTag {
-					return errors.New(fmt.Sprintf("Validation error found two '<' chars in a row (last on line %d)", lineNumber+1))
+					return fmt.Errorf("found two '<' chars in a row on line %d", lineNumber+1)
 				}
 				tb.LocalStart = index
 			}
@@ -155,24 +158,24 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagmatcher.TagMatcher) error {
 				}
 				tb.ResetState()
 			} else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
-				stop, isRecoding, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, tm, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
+				stop, isRecording, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, tm, emitterData, isRecording, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}
 				if err != nil {
-					return fmt.Errorf("Error on line %d %w", lineNumber+1, err)
+					return fmt.Errorf("error on line %d: %w", lineNumber+1, err)
 				}
 				tb.ResetLocalState()
 			} else if tb.LocalEnd != -1 {
 				if err = tb.Add(buffer[:tb.LocalEnd]); err != nil {
-					return fmt.Errorf("Error on line %d %w", lineNumber+1, err)
+					return fmt.Errorf("error on line %d: %w", lineNumber+1, err)
 				}
-				stop, isRecoding, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, tm, emitterData, isRecoding, sr.IsInnerXml, lineNumber)
+				stop, isRecording, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, tm, emitterData, isRecording, sr.IsInnerXml, lineNumber)
 				if stop {
 					return nil
 				}
 				if err != nil {
-					return fmt.Errorf("Error on line %d %w", lineNumber+1, err)
+					return fmt.Errorf("error on line %d: %w", lineNumber+1, err)
 				}
 				tb.ResetState()
 			}
@@ -184,7 +187,7 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagmatcher.TagMatcher) error {
 			addErr = tb.Add(buffer[tb.LocalStart:n])
 		}
 		if addErr != nil {
-			return fmt.Errorf("Error on line %d %w", lineNumber+1, addErr)
+			return fmt.Errorf("error on line %d: %w", lineNumber+1, addErr)
 		}
 		if readErr == io.EOF {
 			break
@@ -205,16 +208,16 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagmatcher.TagMatcher) error {
 }
 
 // todo: clean up!
-func TagHandler(nodeContent []byte, tb *tagbuffer.TagBuffer, cb *contentbuffer.ContentBuffer, matcher *tagmatcher.TagMatcher, emitterData *contentbuffer.EmitterData, isRecoding bool, isInnerXml bool, lineNumber uint64) (bool, bool, error) {
+func TagHandler(nodeContent []byte, tb *tagbuffer.TagBuffer, cb *contentbuffer.ContentBuffer, matcher *tagmatcher.TagMatcher, emitterData *contentbuffer.EmitterData, isRecording bool, isInnerXml bool, lineNumber uint64) (bool, bool, error) {
 	if len(nodeContent) < 2 {
-		return false, isRecoding, errors.New("found empty tag <>")
+		return false, isRecording, errors.New("found empty tag <>")
 	}
 	if nodeContent[1] == byte('/') {
 		if tb.StartTags == 0 {
-			return false, isRecoding, errors.New("found end tag before start tag")
+			return false, isRecording, errors.New("found end tag before start tag")
 		}
 		tb.StartTags--
-		if isRecoding {
+		if isRecording {
 			if matcher.TagNameMatchesLastMatch() {
 				if isInnerXml {
 					cb.Backup(len(nodeContent) + 1)
@@ -237,7 +240,7 @@ func TagHandler(nodeContent []byte, tb *tagbuffer.TagBuffer, cb *contentbuffer.C
 		matcher.RemoveLast()
 		return false, false, nil
 	} else if nodeContent[len(nodeContent)-1] == byte('/') {
-		if !isRecoding {
+		if !isRecording {
 			if err := matcher.AddTag(string(nodeContent[1:])); err != nil {
 				return false, false, err
 			}
@@ -262,13 +265,13 @@ func TagHandler(nodeContent []byte, tb *tagbuffer.TagBuffer, cb *contentbuffer.C
 			}
 			matcher.RemoveLast()
 		}
-		return false, isRecoding, nil
+		return false, isRecording, nil
 	} else {
 		if err := matcher.AddTag(string(nodeContent[1:])); err != nil {
-			return false, isRecoding, err
+			return false, isRecording, err
 		}
 		tb.StartTags++
-		if !isRecoding {
+		if !isRecording {
 			if matcher.MatchesPath() {
 				if !isInnerXml {
 					bufferFullErr := cb.AddArray(nodeContent)

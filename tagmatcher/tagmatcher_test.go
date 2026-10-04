@@ -97,7 +97,7 @@ func TestMatchContain(t *testing.T) {
 
 func TestNotMatchEquals(t *testing.T) {
 	tm := NewTagMatcher("medi")
-	tm.EqualityFn = EqFnEqulas
+	tm.EqualityFn = EqFnEquals
 	tm.AddTag("mediaWiki")
 	assert.False(t, tm.MatchesPath())
 }
