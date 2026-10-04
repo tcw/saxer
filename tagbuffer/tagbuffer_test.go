@@ -7,36 +7,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func addAll(tb *TagBuffer, s string) error {
+	for i := 0; i < len(s); i++ {
+		if err := tb.Add(s[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func TestAdd(t *testing.T) {
 	tb := NewTagBuffer(8)
-	require.NoError(t, tb.Add([]byte("<ab")))
-	require.NoError(t, tb.Add([]byte("cd")))
-	assert.Equal(t, []byte("<abcd"), tb.GetBuffer())
+	require.NoError(t, addAll(&tb, "<abcd"))
+	assert.Equal(t, []byte("<abcd"), tb.Bytes())
+	assert.Equal(t, 5, tb.Len())
 }
 
 func TestAddFillsBufferExactly(t *testing.T) {
 	tb := NewTagBuffer(4)
-	require.NoError(t, tb.Add([]byte("<abc")))
-	assert.Equal(t, []byte("<abc"), tb.GetBuffer())
+	require.NoError(t, addAll(&tb, "<abc"))
+	assert.Equal(t, []byte("<abc"), tb.Bytes())
 }
 
 func TestAddOverflowReturnsError(t *testing.T) {
 	tb := NewTagBuffer(4)
-	require.NoError(t, tb.Add([]byte("<ab")))
-	assert.Error(t, tb.Add([]byte("cd")))
-	assert.Equal(t, []byte("<ab"), tb.GetBuffer())
+	require.NoError(t, addAll(&tb, "<abc"))
+	assert.ErrorIs(t, tb.Add('d'), ErrFull)
+	assert.Equal(t, []byte("<abc"), tb.Bytes())
 }
 
-func TestResetState(t *testing.T) {
+func TestReset(t *testing.T) {
 	tb := NewTagBuffer(8)
-	tb.LocalStart, tb.LocalEnd = 1, 2
-	require.NoError(t, tb.Add([]byte("<ab")))
-
-	tb.ResetLocalState()
-	assert.Equal(t, -1, tb.LocalStart)
-	assert.Equal(t, -1, tb.LocalEnd)
-	assert.Equal(t, []byte("<ab"), tb.GetBuffer())
-
-	tb.ResetState()
-	assert.Empty(t, tb.GetBuffer())
+	require.NoError(t, addAll(&tb, "<ab"))
+	tb.Reset()
+	assert.Empty(t, tb.Bytes())
+	assert.Equal(t, 0, tb.Len())
 }

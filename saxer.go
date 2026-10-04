@@ -155,7 +155,7 @@ func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
 	if err != nil {
 		return err
 	}
-	sr := saxreader.NewSaxReaderNoEmitter()
+	sr := saxreader.New()
 	sr.IsInnerXml = opts.isInnerXml
 	sr.ContentBufferSize = opts.contentBuf * saxreader.MB
 	sr.ElementBufferSize = opts.tagBuffer * saxreader.KB

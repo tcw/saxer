@@ -20,7 +20,6 @@ func newTestSaxReader(emitterTestFn func(*contentbuffer.EmitterData) bool) SaxRe
 	return SaxReader{ElementBufferSize: 100,
 		ContentBufferSize: 1024,
 		ReaderBufferSize:  10,
-		PathDepthSize:     10,
 		EmitterFn:         emitterTestFn,
 		IsInnerXml:        false,
 	}
@@ -364,7 +363,7 @@ func TestReadIsIndependentOfChunking(t *testing.T) {
 		for wrapName, wrap := range readerWrappers {
 			for _, bufSize := range []int{1, 2, 3, 5, 8, 64, 4096} {
 				t.Run(fmt.Sprintf("%s/%s/buf%d", tt.name, wrapName, bufSize), func(t *testing.T) {
-					sr := NewSaxReaderNoEmitter()
+					sr := New()
 					sr.ReaderBufferSize = bufSize
 					got, err := readAll(sr, wrap(strings.NewReader(tt.xml)), tt.query)
 					require.NoError(t, err)
@@ -386,7 +385,7 @@ func TestReadDoctype(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readAll(NewSaxReaderNoEmitter(), strings.NewReader(tt.xml), "b")
+			got, err := readAll(New(), strings.NewReader(tt.xml), "b")
 			require.NoError(t, err)
 			assert.Equal(t, []string{"<b>v</b>"}, got)
 		})
@@ -394,7 +393,7 @@ func TestReadDoctype(t *testing.T) {
 }
 
 func TestReadGreaterThanInAttributeValue(t *testing.T) {
-	got, err := readAll(NewSaxReaderNoEmitter(), strings.NewReader(`<a><b x="1>2" y='3>4'>v</b></a>`), "b?x=1>2")
+	got, err := readAll(New(), strings.NewReader(`<a><b x="1>2" y='3>4'>v</b></a>`), "b?x=1>2")
 	require.NoError(t, err)
 	assert.Equal(t, []string{`<b x="1>2" y='3>4'>v</b>`}, got)
 }
@@ -402,12 +401,12 @@ func TestReadGreaterThanInAttributeValue(t *testing.T) {
 func TestReadReturnsReaderError(t *testing.T) {
 	readErr := errors.New("disk on fire")
 	r := io.MultiReader(strings.NewReader("<a><b>v</b>"), iotest.ErrReader(readErr))
-	_, err := readAll(NewSaxReaderNoEmitter(), r, "b")
+	_, err := readAll(New(), r, "b")
 	assert.ErrorIs(t, err, readErr)
 }
 
 func TestReadTagLargerThanTagBuffer(t *testing.T) {
-	sr := NewSaxReaderNoEmitter()
+	sr := New()
 	sr.ReaderBufferSize = 8
 	sr.ElementBufferSize = 16
 	_, err := readAll(sr, strings.NewReader(`<a><b attr="`+strings.Repeat("x", 100)+`">v</b></a>`), "b")
@@ -416,7 +415,7 @@ func TestReadTagLargerThanTagBuffer(t *testing.T) {
 }
 
 func TestReadContentLargerThanContentBuffer(t *testing.T) {
-	sr := NewSaxReaderNoEmitter()
+	sr := New()
 	sr.ContentBufferSize = 16
 	_, err := readAll(sr, strings.NewReader(`<a><b>`+strings.Repeat("x", 100)+`</b></a>`), "b")
 	require.Error(t, err)
@@ -437,7 +436,7 @@ func TestReadTruncatedDocument(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readAll(NewSaxReaderNoEmitter(), strings.NewReader(tt.xml), "b")
+			got, err := readAll(New(), strings.NewReader(tt.xml), "b")
 			assert.Equal(t, tt.want, got)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "unexpected end of input")
@@ -454,7 +453,7 @@ func TestReadMalformedInputReturnsError(t *testing.T) {
 		strings.Repeat("<a>", 1000),
 	} {
 		t.Run(xml, func(t *testing.T) {
-			_, err := readAll(NewSaxReaderNoEmitter(), strings.NewReader(xml), "b")
+			_, err := readAll(New(), strings.NewReader(xml), "b")
 			assert.Error(t, err)
 		})
 	}
@@ -462,7 +461,7 @@ func TestReadMalformedInputReturnsError(t *testing.T) {
 
 func TestReadStopsWhenEmitterSaysSo(t *testing.T) {
 	var got []string
-	sr := NewSaxReaderNoEmitter()
+	sr := New()
 	sr.EmitterFn = func(ed *contentbuffer.EmitterData) bool {
 		got = append(got, ed.Content)
 		return len(got) == 2
@@ -484,7 +483,7 @@ func FuzzRead(f *testing.F) {
 		f.Add(seed, uint8(3))
 	}
 	f.Fuzz(func(t *testing.T, xml string, bufSize uint8) {
-		sr := NewSaxReaderNoEmitter()
+		sr := New()
 		sr.ElementBufferSize = 64
 		sr.ContentBufferSize = 256
 		want, wantErr := readAll(sr, strings.NewReader(xml), "b")

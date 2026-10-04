@@ -1,1 +1,1 @@
-go test ./histbuffer -bench=.
+go test ./saxreader -run "^$" -bench=.

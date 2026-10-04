@@ -4,38 +4,33 @@ import "errors"
 
 var ErrFull = errors.New("tag is larger than the tag buffer, use --tag-buf to increase buffer")
 
+// TagBuffer holds the bytes of the tag being read, up to a fixed size.
 type TagBuffer struct {
-	buffer     []byte
-	Position   int
-	LocalStart int
-	LocalEnd   int
-	StartTags  int
+	buffer []byte
+	pos    int
 }
 
 func NewTagBuffer(bufferSize int) TagBuffer {
-	return TagBuffer{buffer: make([]byte, bufferSize), Position: 0, LocalStart: -1, LocalEnd: -1, StartTags: 0}
+	return TagBuffer{buffer: make([]byte, bufferSize)}
 }
 
-func (eb *TagBuffer) ResetLocalState() {
-	eb.LocalStart = -1
-	eb.LocalEnd = -1
+func (tb *TagBuffer) Reset() {
+	tb.pos = 0
 }
 
-func (eb *TagBuffer) ResetState() {
-	eb.LocalStart = -1
-	eb.LocalEnd = -1
-	eb.Position = 0
-}
-
-func (eb *TagBuffer) Add(b []byte) error {
-	if eb.Position+len(b) > len(eb.buffer) {
+func (tb *TagBuffer) Add(b byte) error {
+	if tb.pos >= len(tb.buffer) {
 		return ErrFull
 	}
-	copy(eb.buffer[eb.Position:], b)
-	eb.Position = eb.Position + len(b)
+	tb.buffer[tb.pos] = b
+	tb.pos++
 	return nil
 }
 
-func (eb *TagBuffer) GetBuffer() []byte {
-	return eb.buffer[:eb.Position]
+func (tb *TagBuffer) Len() int {
+	return tb.pos
+}
+
+func (tb *TagBuffer) Bytes() []byte {
+	return tb.buffer[:tb.pos]
 }

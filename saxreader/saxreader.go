@@ -6,16 +6,16 @@ import (
 	"io"
 
 	"github.com/tcw/saxer/contentbuffer"
-	"github.com/tcw/saxer/histbuffer"
 	"github.com/tcw/saxer/tagbuffer"
 	"github.com/tcw/saxer/tagmatcher"
 )
 
+// SaxReader holds the settings for reading a document. Read can be called
+// any number of times; all parsing state lives in a parser per call.
 type SaxReader struct {
-	ElementBufferSize int
-	ContentBufferSize int
-	ReaderBufferSize  int
-	PathDepthSize     int
+	ElementBufferSize int // largest tag, in bytes
+	ContentBufferSize int // largest matched element, in bytes
+	ReaderBufferSize  int // size of each read from the input
 	EmitterFn         func(*contentbuffer.EmitterData) bool
 	IsInnerXml        bool
 }
@@ -26,270 +26,275 @@ const (
 	MB = 1024 * KB
 )
 
-func NewSaxReaderNoEmitter() SaxReader {
-
-	return SaxReader{ElementBufferSize: KB * 4,
-		ContentBufferSize: MB * 4,
-		ReaderBufferSize:  KB * 4,
-		PathDepthSize:     1000,
-		EmitterFn:         nil,
-		IsInnerXml:        false}
+// New returns a SaxReader with the default buffer sizes. Set EmitterFn
+// before calling Read.
+func New() SaxReader {
+	return SaxReader{
+		ElementBufferSize: 4 * KB,
+		ContentBufferSize: 4 * MB,
+		ReaderBufferSize:  4 * KB,
+	}
 }
 
-// Kinds of markup that is skipped until its terminator: <!-- -->, <![CDATA[ ]]>,
-// <? ?> and declarations such as <!DOCTYPE ...>.
-const (
-	escapeNone        = 0
-	escapeBang        = 1 // seen "<!", kind not known yet
-	escapeComment     = 2
-	escapeCdata       = 3
-	escapePI          = 4
-	escapeDeclaration = 5
-)
-
-var escapeNames = map[int]string{
-	escapeBang:        "declaration",
-	escapeComment:     "comment",
-	escapeCdata:       "CDATA section",
-	escapePI:          "processing instruction",
-	escapeDeclaration: "declaration",
-}
-
+// Read parses the xml from reader and calls EmitterFn for every element
+// matching tm, until the input ends or EmitterFn returns true.
 func (sr *SaxReader) Read(reader io.Reader, tm *tagmatcher.TagMatcher) error {
-	tb := tagbuffer.NewTagBuffer(sr.ElementBufferSize)
-	history := histbuffer.NewHistoryBuffer(KB * 4)
-	contentBuf := contentbuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
+	p := &parser{
+		matcher:  tm,
+		tag:      tagbuffer.NewTagBuffer(sr.ElementBufferSize),
+		content:  contentbuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn),
+		innerXml: sr.IsInnerXml,
+	}
 	buffer := make([]byte, sr.ReaderBufferSize)
-	emitterData := &contentbuffer.EmitterData{}
-	escape := escapeNone
-	var quote byte = 0    // quote char of the attribute value being read, inside tags and declarations
-	declarationDepth := 0 // nesting of [ ] in a declaration (DOCTYPE internal subset)
-	isRecording := false
-	stop := false
-	var err error
-	var lineNumber uint64 = 0
-
 	for {
 		n, readErr := reader.Read(buffer)
-		tb.ResetLocalState()
-		for index := 0; index < n; index++ {
-			value := buffer[index]
-			if isRecording {
-				bufferFullErr := contentBuf.Add(value)
-				if bufferFullErr != nil {
-					return bufferFullErr
-				}
+		for _, b := range buffer[:n] {
+			if err := p.next(b); err != nil {
+				return fmt.Errorf("error on line %d: %w", p.line+1, err)
 			}
-			if value == 0x0A {
-				lineNumber++
+			if p.stopped {
+				return nil
 			}
-			if escape != escapeNone {
-				history.Add(value)
-				if escape == escapeBang {
-					switch value {
-					case '-':
-						escape = escapeComment
-					case '[':
-						escape = escapeCdata
-					default:
-						escape = escapeDeclaration
-					}
-				}
-				switch escape {
-				case escapeComment:
-					if value == '>' && history.HasLast([]byte("-->")) {
-						escape = escapeNone
-					}
-				case escapeCdata:
-					if value == '>' && history.HasLast([]byte("]]>")) {
-						escape = escapeNone
-					}
-				case escapePI:
-					if value == '>' && history.HasLast([]byte("?>")) {
-						escape = escapeNone
-					}
-				case escapeDeclaration:
-					switch {
-					case quote != 0:
-						if value == quote {
-							quote = 0
-						}
-					case value == '"' || value == '\'':
-						quote = value
-					case value == '[':
-						declarationDepth++
-					case value == ']':
-						declarationDepth--
-					case value == '>' && declarationDepth <= 0:
-						escape = escapeNone
-						declarationDepth = 0
-					}
-				}
-				continue
-			}
-			inTag := tb.LocalStart != -1 || tb.Position > 0
-			if inTag && quote != 0 {
-				if value == quote {
-					quote = 0
-				}
-				continue
-			}
-			if inTag && (value == '"' || value == '\'') {
-				quote = value
-				continue
-			}
-			if value == byte('<') {
-				if inTag {
-					return fmt.Errorf("found two '<' chars in a row on line %d", lineNumber+1)
-				}
-				tb.LocalStart = index
-			}
-			if value == byte('>') {
-				if inTag {
-					tb.LocalEnd = index
-				}
-			}
-			if ((tb.LocalStart != -1 && index != 0 && tb.LocalStart == index-1) && (value == byte('!') || value == byte('?'))) ||
-				(index == 0 && tb.Position == 1 && (value == byte('!') || value == byte('?'))) {
-				if value == '!' {
-					escape = escapeBang
-				} else {
-					escape = escapePI
-				}
-				tb.ResetState()
-			} else if tb.LocalStart != -1 && tb.LocalEnd != -1 && tb.Position == 0 {
-				stop, isRecording, err = TagHandler(buffer[tb.LocalStart:tb.LocalEnd], &tb, &contentBuf, tm, emitterData, isRecording, sr.IsInnerXml, lineNumber)
-				if stop {
-					return nil
-				}
-				if err != nil {
-					return fmt.Errorf("error on line %d: %w", lineNumber+1, err)
-				}
-				tb.ResetLocalState()
-			} else if tb.LocalEnd != -1 {
-				if err = tb.Add(buffer[:tb.LocalEnd]); err != nil {
-					return fmt.Errorf("error on line %d: %w", lineNumber+1, err)
-				}
-				stop, isRecording, err = TagHandler(tb.GetBuffer(), &tb, &contentBuf, tm, emitterData, isRecording, sr.IsInnerXml, lineNumber)
-				if stop {
-					return nil
-				}
-				if err != nil {
-					return fmt.Errorf("error on line %d: %w", lineNumber+1, err)
-				}
-				tb.ResetState()
-			}
-		}
-		var addErr error
-		if tb.LocalStart == -1 && tb.LocalEnd == -1 && tb.Position > 0 {
-			addErr = tb.Add(buffer[:n])
-		} else if tb.LocalStart != -1 {
-			addErr = tb.Add(buffer[tb.LocalStart:n])
-		}
-		if addErr != nil {
-			return fmt.Errorf("error on line %d: %w", lineNumber+1, addErr)
 		}
 		if readErr == io.EOF {
-			break
+			return p.end()
 		}
 		if readErr != nil {
 			return fmt.Errorf("error reading xml: %w", readErr)
 		}
 	}
+}
+
+// Kinds of markup that is skipped until its terminator: <!-- -->, <![CDATA[ ]]>,
+// <? ?> and declarations such as <!DOCTYPE ...>.
+type markup int
+
+const (
+	markupNone        markup = iota
+	markupBang               // seen "<!", kind not known yet
+	markupComment            // <!-- -->
+	markupCdata              // <![CDATA[ ]]>
+	markupPI                 // <? ?>
+	markupDeclaration        // <!DOCTYPE ...>, may contain [ ] and quoted strings
+)
+
+var markupNames = map[markup]string{
+	markupBang:        "declaration",
+	markupComment:     "comment",
+	markupCdata:       "CDATA section",
+	markupPI:          "processing instruction",
+	markupDeclaration: "declaration",
+}
+
+// parser is the state of a single Read. It is fed one byte at a time, so
+// tags, markup and quoted values may span any number of reads.
+type parser struct {
+	matcher  *tagmatcher.TagMatcher
+	tag      tagbuffer.TagBuffer // the tag being read, from '<' up to but excluding '>'
+	content  contentbuffer.ContentBuffer
+	match    contentbuffer.EmitterData
+	innerXml bool
+
+	line      uint64 // newlines seen so far
+	depth     int    // open elements
+	inTag     bool
+	inMarkup  markup
+	quote     byte    // quote char of the value being read in a tag or declaration, or 0
+	declDepth int     // nesting of [ ] in a declaration (DOCTYPE internal subset)
+	tail      [2]byte // last two bytes of the current markup, to find its terminator
+	recording bool    // inside a matched element, its bytes go to content
+	stopped   bool    // the emitter asked to stop
+}
+
+func (p *parser) next(b byte) error {
+	if p.recording {
+		if err := p.content.Add(b); err != nil {
+			return err
+		}
+	}
+	if b == '\n' {
+		p.line++
+	}
 	switch {
-	case escape != escapeNone:
-		return fmt.Errorf("unexpected end of input inside %s", escapeNames[escape])
-	case tb.LocalStart != -1 || tb.Position > 0:
-		return errors.New("unexpected end of input inside tag")
-	case tb.StartTags > 0:
-		return fmt.Errorf("unexpected end of input, %d element(s) not closed", tb.StartTags)
+	case p.inMarkup != markupNone:
+		p.markupByte(b)
+	case p.inTag:
+		return p.tagByte(b)
+	case b == '<':
+		p.inTag = true
+		p.tag.Reset()
+		return p.tag.Add(b)
 	}
 	return nil
 }
 
-// todo: clean up!
-func TagHandler(nodeContent []byte, tb *tagbuffer.TagBuffer, cb *contentbuffer.ContentBuffer, matcher *tagmatcher.TagMatcher, emitterData *contentbuffer.EmitterData, isRecording bool, isInnerXml bool, lineNumber uint64) (bool, bool, error) {
-	if len(nodeContent) < 2 {
-		return false, isRecording, errors.New("found empty tag <>")
+// end checks that the document did not stop in the middle of something.
+func (p *parser) end() error {
+	switch {
+	case p.inMarkup != markupNone:
+		return fmt.Errorf("unexpected end of input inside %s", markupNames[p.inMarkup])
+	case p.inTag:
+		return errors.New("unexpected end of input inside tag")
+	case p.depth > 0:
+		return fmt.Errorf("unexpected end of input, %d element(s) not closed", p.depth)
 	}
-	if nodeContent[1] == byte('/') {
-		if tb.StartTags == 0 {
-			return false, isRecording, errors.New("found end tag before start tag")
+	return nil
+}
+
+func (p *parser) tagByte(b byte) error {
+	switch {
+	case p.quote != 0:
+		if b == p.quote {
+			p.quote = 0
 		}
-		tb.StartTags--
-		if isRecording {
-			if matcher.TagNameMatchesLastMatch() {
-				if isInnerXml {
-					cb.Backup(len(nodeContent) + 1)
-				}
-				emitterData.NodePath = matcher.GetCurrentPath()
-				emitterData.LineEnd = lineNumber + 1
-				stop := cb.Emit(emitterData)
-				emitterData.Reset()
-				if stop {
-					return true, false, nil
-				}
-				cb.Reset()
-				matcher.RemoveLast()
-				return false, false, nil
-			} else {
-				matcher.RemoveLast()
-				return false, true, nil
-			}
+	case b == '"' || b == '\'':
+		p.quote = b
+	case b == '<':
+		return errors.New("found two '<' chars in a row")
+	case b == '>':
+		p.inTag = false
+		return p.handleTag(p.tag.Bytes())
+	case p.tag.Len() == 1 && (b == '!' || b == '?'):
+		p.inTag = false
+		p.inMarkup = markupPI
+		if b == '!' {
+			p.inMarkup = markupBang
 		}
-		matcher.RemoveLast()
-		return false, false, nil
-	} else if nodeContent[len(nodeContent)-1] == byte('/') {
-		if !isRecording {
-			if err := matcher.AddTag(string(nodeContent[1:])); err != nil {
-				return false, false, err
-			}
-			if matcher.MatchesPath() {
-				bufferFullErr := cb.AddArray(nodeContent)
-				if bufferFullErr != nil {
-					return false, false, bufferFullErr
-				}
-				bufferFullErr = cb.Add(byte('>'))
-				if bufferFullErr != nil {
-					return false, false, bufferFullErr
-				}
-				emitterData.NodePath = matcher.GetCurrentPath()
-				emitterData.LineStart = lineNumber + 1
-				emitterData.LineEnd = lineNumber + 1
-				stop := cb.Emit(emitterData)
-				emitterData.Reset()
-				if stop {
-					return true, false, nil
-				}
-				cb.Reset()
-			}
-			matcher.RemoveLast()
-		}
-		return false, isRecording, nil
-	} else {
-		if err := matcher.AddTag(string(nodeContent[1:])); err != nil {
-			return false, isRecording, err
-		}
-		tb.StartTags++
-		if !isRecording {
-			if matcher.MatchesPath() {
-				if !isInnerXml {
-					bufferFullErr := cb.AddArray(nodeContent)
-					if bufferFullErr != nil {
-						return false, false, bufferFullErr
-					}
-					bufferFullErr = cb.Add(byte('>'))
-					if bufferFullErr != nil {
-						return false, false, bufferFullErr
-					}
-				}
-				emitterData.LineStart = lineNumber + 1
-				return false, true, nil
-			} else {
-				return false, false, nil
-			}
-		} else {
-			return false, true, nil
+		p.tail = [2]byte{}
+		return nil
+	}
+	return p.tag.Add(b)
+}
+
+func (p *parser) markupByte(b byte) {
+	if p.inMarkup == markupBang {
+		switch b {
+		case '-':
+			p.inMarkup = markupComment
+		case '[':
+			p.inMarkup = markupCdata
+		default:
+			p.inMarkup = markupDeclaration
 		}
 	}
+	switch p.inMarkup {
+	case markupComment:
+		p.endMarkupAfter(b, '-', '-')
+	case markupCdata:
+		p.endMarkupAfter(b, ']', ']')
+	case markupPI:
+		p.endMarkupAfter(b, 0, '?')
+	case markupDeclaration:
+		switch {
+		case p.quote != 0:
+			if b == p.quote {
+				p.quote = 0
+			}
+		case b == '"' || b == '\'':
+			p.quote = b
+		case b == '[':
+			p.declDepth++
+		case b == ']':
+			p.declDepth--
+		case b == '>' && p.declDepth <= 0:
+			p.inMarkup = markupNone
+			p.declDepth = 0
+		}
+	}
+	p.tail = [2]byte{p.tail[1], b}
+}
+
+// endMarkupAfter ends the current markup when b is a '>' that follows the
+// bytes first and second. A zero first matches any byte.
+func (p *parser) endMarkupAfter(b, first, second byte) {
+	if b == '>' && p.tail[1] == second && (first == 0 || p.tail[0] == first) {
+		p.inMarkup = markupNone
+	}
+}
+
+// handleTag handles a complete tag, from '<' up to but excluding '>'.
+func (p *parser) handleTag(tag []byte) error {
+	switch {
+	case len(tag) < 2:
+		return errors.New("found empty tag <>")
+	case tag[1] == '/':
+		return p.endTag(tag)
+	case tag[len(tag)-1] == '/':
+		return p.selfClosingTag(tag)
+	default:
+		return p.startTag(tag)
+	}
+}
+
+func (p *parser) startTag(tag []byte) error {
+	if err := p.matcher.AddTag(string(tag[1:])); err != nil {
+		return err
+	}
+	p.depth++
+	if p.recording || !p.matcher.MatchesPath() {
+		return nil
+	}
+	if !p.innerXml {
+		if err := p.recordTag(tag); err != nil {
+			return err
+		}
+	}
+	p.match.LineStart = p.line + 1
+	p.recording = true
+	return nil
+}
+
+func (p *parser) endTag(tag []byte) error {
+	if p.depth == 0 {
+		return errors.New("found end tag before start tag")
+	}
+	p.depth--
+	if p.recording && p.matcher.TagNameMatchesLastMatch() {
+		if p.innerXml {
+			// The end tag was recorded byte by byte, '<' to '>'.
+			p.content.Backup(len(tag) + 1)
+		}
+		p.recording = false
+		p.emit()
+	}
+	p.matcher.RemoveLast()
+	return nil
+}
+
+// selfClosingTag handles <tag/>. Inside a match it is already recorded.
+func (p *parser) selfClosingTag(tag []byte) error {
+	if p.recording {
+		return nil
+	}
+	if err := p.matcher.AddTag(string(tag[1:])); err != nil {
+		return err
+	}
+	defer p.matcher.RemoveLast()
+	if !p.matcher.MatchesPath() {
+		return nil
+	}
+	if err := p.recordTag(tag); err != nil {
+		return err
+	}
+	p.match.LineStart = p.line + 1
+	p.emit()
+	return nil
+}
+
+// recordTag adds the tag that starts a match to the content, which only
+// records bytes after it.
+func (p *parser) recordTag(tag []byte) error {
+	if err := p.content.AddArray(tag); err != nil {
+		return err
+	}
+	return p.content.Add('>')
+}
+
+// emit hands the recorded match to the emitter and clears it.
+func (p *parser) emit() {
+	p.match.NodePath = p.matcher.GetCurrentPath()
+	p.match.LineEnd = p.line + 1
+	p.stopped = p.content.Emit(&p.match)
+	p.match.Reset()
+	p.content.Reset()
 }
