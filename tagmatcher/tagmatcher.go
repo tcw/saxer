@@ -30,10 +30,13 @@ var EqFnContains = func(query string, source string) bool {
 	return strings.Contains(source, query)
 }
 
-func NewTagMatcher(queryString string) TagMatcher {
+func NewTagMatcher(queryString string) (TagMatcher, error) {
 	path := tagpath.NewTagPath()
 	last := make([]string, 1000)
-	q := queryparser.Parse(queryString)
+	q, err := queryparser.Parse(queryString)
+	if err != nil {
+		return TagMatcher{}, err
+	}
 	qHasAttributes := false
 	qHasPath := false
 	tAttr := make([]int, 1024*4)
@@ -55,7 +58,7 @@ func NewTagMatcher(queryString string) TagMatcher {
 		tmpAttrPos:       0,
 		EqualityFn:       EqFnEquals,
 		CaseSensitive:    true,
-		WithoutNamespace: false}
+		WithoutNamespace: false}, nil
 }
 
 func (tm *TagMatcher) GetCurrentPath() string {

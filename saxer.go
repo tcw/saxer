@@ -139,7 +139,10 @@ func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
 	var err error
 	var sr saxreader.SaxReader
 	sr = saxreader.NewSaxReaderNoEmitter()
-	tm := tagmatcher.NewTagMatcher(opts.query)
+	tm, err := tagmatcher.NewTagMatcher(opts.query)
+	if err != nil {
+		return err
+	}
 	if opts.containMatch {
 		tm.EqualityFn = tagmatcher.EqFnContains
 	} else {

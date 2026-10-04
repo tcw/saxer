@@ -1,51 +1,53 @@
 package queryparser
 
 import (
-	"github.com/tcw/saxer/tagpath"
+	"fmt"
 	"strings"
+
+	"github.com/tcw/saxer/tagpath"
 )
 
-func Parse(query string) *tagpath.TagPath {
-	split := strings.Split(query, "/")
+// Parse turns a query such as "a/b?id=1&ref" into a TagPath. Each "/"
+// separated segment is a tag name, optionally followed by "?" and "&"
+// separated attributes, each either "key" or "key=value".
+func Parse(query string) (*tagpath.TagPath, error) {
 	path := tagpath.NewTagPath()
-	for _, value := range split {
+	for _, value := range strings.Split(query, "/") {
 		tagText := strings.TrimSpace(value)
-		if len(tagText) != 0 {
-			addTag(tagText, path)
+		if len(tagText) == 0 {
+			continue
+		}
+		if path.PathPos >= tagpath.MaxDepth {
+			return nil, fmt.Errorf("query has more than %d levels", tagpath.MaxDepth)
+		}
+		if err := addTag(tagText, path.NextTag()); err != nil {
+			return nil, fmt.Errorf("invalid query %q: %w", query, err)
 		}
 	}
-	return path
+	return path, nil
 }
 
-func addTag(tagText string, tp *tagpath.TagPath) {
-	tag := tp.NextTag()
-	if strings.Contains(tagText, "?") {
-		elem := strings.Split(tagText, "?")
-		if len(elem) != 0 {
-			if len(elem[0]) > 0 {
-				tag.Name = elem[0]
-			}
-			if len(elem[1]) > 0 {
-				if strings.Contains(elem[1], "&") {
-					attr := strings.Split(elem[1], "&")
-					for _, val := range attr {
-						addToAttribute(val, tag)
-					}
-				} else {
-					addToAttribute(elem[1], tag)
-				}
-			}
+func addTag(tagText string, tag *tagpath.Tag) error {
+	name, attrs, hasAttrs := strings.Cut(tagText, "?")
+	tag.Name = name
+	if !hasAttrs || len(attrs) == 0 {
+		return nil
+	}
+	if strings.Contains(attrs, "?") {
+		return fmt.Errorf("more than one '?' in %q", tagText)
+	}
+	for _, attr := range strings.Split(attrs, "&") {
+		if tag.AttributePos >= tagpath.MaxAttributes {
+			return fmt.Errorf("more than %d attributes in %q", tagpath.MaxAttributes, tagText)
 		}
-	} else {
-		tag.Name = tagText
+		key, value, _ := strings.Cut(attr, "=")
+		if len(key) == 0 {
+			return fmt.Errorf("attribute without a name in %q", tagText)
+		}
+		if strings.Contains(value, "=") {
+			return fmt.Errorf("more than one '=' in attribute %q", attr)
+		}
+		tag.AddAttribute(key, value)
 	}
-}
-
-func addToAttribute(attr string, tg *tagpath.Tag) {
-	if strings.Contains(attr, "=") {
-		attrKeyVal := strings.Split(attr, "=")
-		tg.AddAttribute(attrKeyVal[0], attrKeyVal[1])
-	} else {
-		tg.AddAttribute(attr, "")
-	}
+	return nil
 }
