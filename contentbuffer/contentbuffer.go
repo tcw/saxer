@@ -1,4 +1,4 @@
-package contentBuffer
+package contentbuffer
 
 import "errors"
 

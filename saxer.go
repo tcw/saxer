@@ -11,9 +11,9 @@ import (
 	"sync"
 
 	"github.com/spf13/cobra"
-	"github.com/tcw/saxer/contentBuffer"
-	"github.com/tcw/saxer/saxReader"
-	"github.com/tcw/saxer/tagMatcher"
+	"github.com/tcw/saxer/contentbuffer"
+	"github.com/tcw/saxer/saxreader"
+	"github.com/tcw/saxer/tagmatcher"
 )
 
 const version = "0.0.7"
@@ -112,7 +112,7 @@ func run(opts *options, filename string, in io.Reader, out io.Writer) error {
 	return SaxXmlInput(bufio.NewReader(in), out, opts)
 }
 
-func emitterMetaPrinter(out io.Writer, emitter chan contentBuffer.EmitterData, wg *sync.WaitGroup) {
+func emitterMetaPrinter(out io.Writer, emitter chan contentbuffer.EmitterData, wg *sync.WaitGroup) {
 	for ed := range emitter {
 		fmt.Fprintf(out, "%d-%d    %s\n", ed.LineStart, ed.LineEnd, ed.NodePath)
 		wg.Done()
@@ -140,13 +140,13 @@ func emitterPrinter(out io.Writer, emitter chan string, wg *sync.WaitGroup, line
 
 func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
 	var err error
-	var sr saxReader.SaxReader
-	sr = saxReader.NewSaxReaderNoEmitter()
-	tm := tagMatcher.NewTagMatcher(opts.query)
+	var sr saxreader.SaxReader
+	sr = saxreader.NewSaxReaderNoEmitter()
+	tm := tagmatcher.NewTagMatcher(opts.query)
 	if opts.containMatch {
-		tm.EqualityFn = tagMatcher.EqFnContains
+		tm.EqualityFn = tagmatcher.EqFnContains
 	} else {
-		tm.EqualityFn = tagMatcher.EqFnEqulas
+		tm.EqualityFn = tagmatcher.EqFnEqulas
 	}
 	tm.CaseSensitive = !opts.caseInsensitive
 	tm.WithoutNamespace = opts.omitNamespace
@@ -158,7 +158,7 @@ func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
 	}
 	if opts.count {
 		var counter uint64 = 0
-		emitterCounter := func(ed *contentBuffer.EmitterData) bool {
+		emitterCounter := func(ed *contentbuffer.EmitterData) bool {
 			counter++
 			return false
 		}
@@ -167,12 +167,12 @@ func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
 		fmt.Fprintln(out, counter)
 	} else if opts.meta {
 		counter := 0
-		elemChan := make(chan contentBuffer.EmitterData, 100)
+		elemChan := make(chan contentbuffer.EmitterData, 100)
 		var wg sync.WaitGroup
 		go emitterMetaPrinter(out, elemChan, &wg)
-		emitter := func(ed *contentBuffer.EmitterData) bool {
+		emitter := func(ed *contentbuffer.EmitterData) bool {
 			wg.Add(1)
-			elemChan <- contentBuffer.EmitterData{Content: ed.Content, LineStart: ed.LineStart, LineEnd: ed.LineEnd, NodePath: ed.NodePath}
+			elemChan <- contentbuffer.EmitterData{Content: ed.Content, LineStart: ed.LineStart, LineEnd: ed.LineEnd, NodePath: ed.NodePath}
 			if opts.firstN > 0 {
 				counter++
 				if counter >= opts.firstN {
@@ -192,7 +192,7 @@ func SaxXmlInput(reader io.Reader, out io.Writer, opts *options) error {
 		elemChan := make(chan string, 100)
 		var wg sync.WaitGroup
 		go emitterPrinter(out, elemChan, &wg, opts.singleLine, opts.unescape)
-		emitter := func(ed *contentBuffer.EmitterData) bool {
+		emitter := func(ed *contentbuffer.EmitterData) bool {
 			wg.Add(1)
 			elemChan <- ed.Content
 			if opts.firstN > 0 {

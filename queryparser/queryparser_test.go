@@ -1,4 +1,4 @@
-package queryParser
+package queryparser
 
 import (
 	"github.com/stretchr/testify/assert"

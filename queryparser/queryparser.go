@@ -1,13 +1,13 @@
-package queryParser
+package queryparser
 
 import (
-	"github.com/tcw/saxer/tagPath"
+	"github.com/tcw/saxer/tagpath"
 	"strings"
 )
 
-func Parse(query string) *tagPath.TagPath {
+func Parse(query string) *tagpath.TagPath {
 	split := strings.Split(query, "/")
-	path := tagPath.NewTagPath()
+	path := tagpath.NewTagPath()
 	for _, value := range split {
 		tagText := strings.TrimSpace(value)
 		if len(tagText) != 0 {
@@ -17,7 +17,7 @@ func Parse(query string) *tagPath.TagPath {
 	return path
 }
 
-func addTag(tagText string, tp *tagPath.TagPath) {
+func addTag(tagText string, tp *tagpath.TagPath) {
 	tag := tp.NextTag()
 	if strings.Contains(tagText, "?") {
 		elem := strings.Split(tagText, "?")
@@ -41,7 +41,7 @@ func addTag(tagText string, tp *tagPath.TagPath) {
 	}
 }
 
-func addToAttribute(attr string, tg *tagPath.Tag) {
+func addToAttribute(attr string, tg *tagpath.Tag) {
 	if strings.Contains(attr, "=") {
 		attrKeyVal := strings.Split(attr, "=")
 		tg.AddAttribute(attrKeyVal[0], attrKeyVal[1])

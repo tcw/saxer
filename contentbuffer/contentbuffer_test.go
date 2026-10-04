@@ -1,4 +1,4 @@
-package contentBuffer
+package contentbuffer
 
 import (
 	"github.com/stretchr/testify/assert"

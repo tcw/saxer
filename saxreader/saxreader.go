@@ -1,14 +1,14 @@
-package saxReader
+package saxreader
 
 import (
 	"fmt"
-	"github.com/tcw/saxer/contentBuffer"
-	"github.com/tcw/saxer/histBuffer"
+	"github.com/tcw/saxer/contentbuffer"
+	"github.com/tcw/saxer/histbuffer"
 	"io"
 
 	"errors"
-	"github.com/tcw/saxer/tagBuffer"
-	"github.com/tcw/saxer/tagMatcher"
+	"github.com/tcw/saxer/tagbuffer"
+	"github.com/tcw/saxer/tagmatcher"
 )
 
 type SaxReader struct {
@@ -16,7 +16,7 @@ type SaxReader struct {
 	ContentBufferSize int
 	ReaderBufferSize  int
 	PathDepthSize     int
-	EmitterFn         func(*contentBuffer.EmitterData) bool
+	EmitterFn         func(*contentbuffer.EmitterData) bool
 	IsInnerXml        bool
 }
 
@@ -52,12 +52,12 @@ var escapeNames = map[int]string{
 	escapeDeclaration: "declaration",
 }
 
-func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
-	tb := tagBuffer.NewTagBuffer(sr.ElementBufferSize)
-	history := histBuffer.NewHistoryBuffer(ONE_KB * 4)
-	contentBuf := contentBuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
+func (sr *SaxReader) Read(reader io.Reader, tm *tagmatcher.TagMatcher) error {
+	tb := tagbuffer.NewTagBuffer(sr.ElementBufferSize)
+	history := histbuffer.NewHistoryBuffer(ONE_KB * 4)
+	contentBuf := contentbuffer.NewContentBuffer(sr.ContentBufferSize, sr.EmitterFn)
 	buffer := make([]byte, sr.ReaderBufferSize)
-	emitterData := &contentBuffer.EmitterData{}
+	emitterData := &contentbuffer.EmitterData{}
 	escape := escapeNone
 	var quote byte = 0    // quote char of the attribute value being read, inside tags and declarations
 	declarationDepth := 0 // nesting of [ ] in a declaration (DOCTYPE internal subset)
@@ -205,7 +205,7 @@ func (sr *SaxReader) Read(reader io.Reader, tm *tagMatcher.TagMatcher) error {
 }
 
 // todo: clean up!
-func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *contentBuffer.ContentBuffer, matcher *tagMatcher.TagMatcher, emitterData *contentBuffer.EmitterData, isRecoding bool, isInnerXml bool, lineNumber uint64) (bool, bool, error) {
+func TagHandler(nodeContent []byte, tb *tagbuffer.TagBuffer, cb *contentbuffer.ContentBuffer, matcher *tagmatcher.TagMatcher, emitterData *contentbuffer.EmitterData, isRecoding bool, isInnerXml bool, lineNumber uint64) (bool, bool, error) {
 	if len(nodeContent) < 2 {
 		return false, isRecoding, errors.New("found empty tag <>")
 	}
@@ -217,16 +217,16 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 		if isRecoding {
 			if matcher.TagNameMatchesLastMatch() {
 				if isInnerXml {
-					contentBuffer.Backup(len(nodeContent) + 1)
+					cb.Backup(len(nodeContent) + 1)
 				}
 				emitterData.NodePath = matcher.GetCurrentPath()
 				emitterData.LineEnd = lineNumber + 1
-				stop := contentBuffer.Emit(emitterData)
+				stop := cb.Emit(emitterData)
 				emitterData.Reset()
 				if stop {
 					return true, false, nil
 				}
-				contentBuffer.Reset()
+				cb.Reset()
 				matcher.RemoveLast()
 				return false, false, nil
 			} else {
@@ -242,23 +242,23 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 				return false, false, err
 			}
 			if matcher.MatchesPath() {
-				bufferFullErr := contentBuffer.AddArray(nodeContent)
+				bufferFullErr := cb.AddArray(nodeContent)
 				if bufferFullErr != nil {
 					return false, false, bufferFullErr
 				}
-				bufferFullErr = contentBuffer.Add(byte('>'))
+				bufferFullErr = cb.Add(byte('>'))
 				if bufferFullErr != nil {
 					return false, false, bufferFullErr
 				}
 				emitterData.NodePath = matcher.GetCurrentPath()
 				emitterData.LineStart = lineNumber + 1
 				emitterData.LineEnd = lineNumber + 1
-				stop := contentBuffer.Emit(emitterData)
+				stop := cb.Emit(emitterData)
 				emitterData.Reset()
 				if stop {
 					return true, false, nil
 				}
-				contentBuffer.Reset()
+				cb.Reset()
 			}
 			matcher.RemoveLast()
 		}
@@ -271,11 +271,11 @@ func TagHandler(nodeContent []byte, tb *tagBuffer.TagBuffer, contentBuffer *cont
 		if !isRecoding {
 			if matcher.MatchesPath() {
 				if !isInnerXml {
-					bufferFullErr := contentBuffer.AddArray(nodeContent)
+					bufferFullErr := cb.AddArray(nodeContent)
 					if bufferFullErr != nil {
 						return false, false, bufferFullErr
 					}
-					bufferFullErr = contentBuffer.Add(byte('>'))
+					bufferFullErr = cb.Add(byte('>'))
 					if bufferFullErr != nil {
 						return false, false, bufferFullErr
 					}

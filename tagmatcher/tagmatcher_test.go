@@ -1,11 +1,11 @@
-package tagMatcher
+package tagmatcher
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/tcw/saxer/tagPath"
+	"github.com/tcw/saxer/tagpath"
 )
 
 func TestAddTagWithAttributeWithSpace(t *testing.T) {
@@ -122,7 +122,7 @@ func TestAddTagMalformedAttributes(t *testing.T) {
 
 func TestAddTagTooDeep(t *testing.T) {
 	tm := NewTagMatcher("a")
-	for i := 0; i < tagPath.MaxDepth; i++ {
+	for i := 0; i < tagpath.MaxDepth; i++ {
 		assert.NoError(t, tm.AddTag("a"))
 	}
 	assert.Error(t, tm.AddTag("a"))
@@ -131,7 +131,7 @@ func TestAddTagTooDeep(t *testing.T) {
 func TestAddTagTooManyAttributes(t *testing.T) {
 	tm := NewTagMatcher("a")
 	tag := "a"
-	for i := 0; i <= tagPath.MaxAttributes; i++ {
+	for i := 0; i <= tagpath.MaxAttributes; i++ {
 		tag += fmt.Sprintf(" a%d=\"%d\"", i, i)
 	}
 	assert.Error(t, tm.AddTag(tag))

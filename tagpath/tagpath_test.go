@@ -1,4 +1,4 @@
-package tagPath
+package tagpath
 
 import (
 	"github.com/stretchr/testify/assert"

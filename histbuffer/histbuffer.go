@@ -1,4 +1,4 @@
-package histBuffer
+package histbuffer
 
 import "math"
 

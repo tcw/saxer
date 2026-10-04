@@ -49,12 +49,12 @@ jobs:
         run: go tool cover -func=coverage.out | tail -1
 
       - name: Fuzz the reader
-        run: go test ./saxReader -run '^$' -fuzz FuzzRead -fuzztime 30s
+        run: go test ./saxreader -run '^$' -fuzz FuzzRead -fuzztime 30s
 
       - name: Upload fuzz failures
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: fuzz-corpus
-          path: saxReader/testdata/fuzz
+          path: saxreader/testdata/fuzz
           if-no-files-found: ignore

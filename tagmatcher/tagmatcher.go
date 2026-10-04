@@ -1,18 +1,18 @@
-package tagMatcher
+package tagmatcher
 
 import (
 	"fmt"
 
-	"github.com/tcw/saxer/queryParser"
-	"github.com/tcw/saxer/tagPath"
+	"github.com/tcw/saxer/queryparser"
+	"github.com/tcw/saxer/tagpath"
 	"strings"
 )
 
 type TagMatcher struct {
-	query              tagPath.TagPath
+	query              tagpath.TagPath
 	queryHasAttributes bool
 	queryHasPath       bool
-	path               tagPath.TagPath
+	path               tagpath.TagPath
 	lastMatchPath      []string
 	lastMatchPos       int
 	tmpAttr            []int
@@ -31,9 +31,9 @@ var EqFnContains = func(query string, source string) bool {
 }
 
 func NewTagMatcher(queryString string) TagMatcher {
-	path := tagPath.NewTagPath()
+	path := tagpath.NewTagPath()
 	last := make([]string, 1000)
-	q := queryParser.Parse(queryString)
+	q := queryparser.Parse(queryString)
 	qHasAttributes := false
 	qHasPath := false
 	tAttr := make([]int, 1024*4)
@@ -76,8 +76,8 @@ func (tm *TagMatcher) AddTag(tagText string) error {
 	}
 	trimmed := strings.TrimSpace(cleanedTag)
 	for key, value := range trimmed {
-		if tm.tmpAttrPos >= 4*tagPath.MaxAttributes {
-			return fmt.Errorf("more than %d attributes in tag <%s>", tagPath.MaxAttributes, tagText)
+		if tm.tmpAttrPos >= 4*tagpath.MaxAttributes {
+			return fmt.Errorf("more than %d attributes in tag <%s>", tagpath.MaxAttributes, tagText)
 		}
 		if isSpace(value) && !insideAttrValue {
 			if tagNameEnd == 0 {
@@ -108,8 +108,8 @@ func (tm *TagMatcher) AddTag(tagText string) error {
 			tm.tmpAttrPos++
 		}
 	}
-	if tm.path.PathPos >= tagPath.MaxDepth {
-		return fmt.Errorf("elements nested deeper than %d levels are not supported", tagPath.MaxDepth)
+	if tm.path.PathPos >= tagpath.MaxDepth {
+		return fmt.Errorf("elements nested deeper than %d levels are not supported", tagpath.MaxDepth)
 	}
 	tag := tm.path.NextTag()
 	if tm.tmpAttrPos == 0 {
@@ -213,7 +213,7 @@ func (tm *TagMatcher) MatchesPath() bool {
 	}
 }
 
-func toLowerCaseInPlace(elems []tagPath.Attribute) {
+func toLowerCaseInPlace(elems []tagpath.Attribute) {
 	for i := 0; i < len(elems); i++ {
 		elems[i].Key = strings.ToLower(elems[i].Key)
 		elems[i].Value = strings.ToLower(elems[i].Value)

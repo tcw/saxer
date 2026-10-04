@@ -1,4 +1,4 @@
-package tagBuffer
+package tagbuffer
 
 import (
 	"testing"
