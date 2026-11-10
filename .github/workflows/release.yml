@@ -4,8 +4,15 @@ on:
   push:
     tags:
       - "v*"
-  # Manual dry run: builds a snapshot and never publishes a release.
+  # Manual run. With a tag (e.g. v1.0.0) it creates that tag on the
+  # selected branch and publishes a real release. Without a tag it builds
+  # a snapshot and attaches the binaries to the run as an artifact.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to release (e.g. v1.0.0). Leave empty for a snapshot build."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -13,6 +20,8 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -26,8 +35,22 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Create tag
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+].*)?$ ]]; then
+            echo "::error::Tag '$TAG' is not a semantic version like v1.2.3"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag '$TAG' already exists"
+            exit 1
+          fi
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
+
       - name: Release
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || inputs.tag != ''
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
@@ -37,9 +60,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Snapshot (dry run)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
         uses: goreleaser/goreleaser-action@v7
         with:
           distribution: goreleaser
           version: "~> v2"
           args: release --snapshot --clean
+
+      - name: Upload snapshot binaries
+        if: github.event_name == 'workflow_dispatch' && inputs.tag == ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: saxer-snapshot
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+          if-no-files-found: error

@@ -298,7 +298,7 @@ Compare benchmark runs with [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd
 
 ### Releasing
 
-Pushing a tag that starts with `v` (for example `v1.2.0`, or `v1.2.0-rc.1` for a prerelease) runs the [release workflow](.github/workflows/release.yml): it runs the tests, then [GoReleaser](https://goreleaser.com) builds binaries for linux, darwin and windows on amd64 and arm64, and publishes them with `checksums.txt` and a changelog on a GitHub Release. Commits starting with `docs:`, `test:` or `chore:` are left out of the changelog. Running the workflow by hand builds a snapshot without publishing anything; locally the same is:
+Pushing a tag that starts with `v` (for example `v1.2.0`, or `v1.2.0-rc.1` for a prerelease) runs the [release workflow](.github/workflows/release.yml): it runs the tests, then [GoReleaser](https://goreleaser.com) builds binaries for linux, darwin and windows on amd64 and arm64, and publishes them with `checksums.txt` and a changelog on a GitHub Release. Commits starting with `docs:`, `test:` or `chore:` are left out of the changelog. You can also release from the Actions tab (or the GitHub mobile app): run the Release workflow by hand and enter a version such as `v1.2.0` in the **tag** field; the workflow creates the tag on the chosen branch and publishes the release. Leave the field empty for a snapshot build that publishes nothing and attaches the archives to the run as a `saxer-snapshot` artifact; locally the same is:
 
     goreleaser check
     goreleaser release --snapshot --clean   # archives land in dist/
