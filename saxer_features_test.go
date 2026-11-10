@@ -213,6 +213,15 @@ func TestVersion(t *testing.T) {
 	assert.Equal(t, "v9.9.9", buildVersion())
 }
 
+func TestVersionFlag(t *testing.T) {
+	oldV, oldC, oldD := version, commit, date
+	defer func() { version, commit, date = oldV, oldC, oldD }()
+	version, commit, date = "1.2.3", "abc123", "2026-11-10T00:00:00Z"
+	got, err := runSaxer(t, strings.NewReader(""), "--version")
+	require.NoError(t, err)
+	assert.Equal(t, "saxer 1.2.3\ncommit: abc123\nbuilt: 2026-11-10T00:00:00Z\n", got)
+}
+
 func TestSquashFunctions(t *testing.T) {
 	assert.Equal(t, "a b c", string(squash(nil, []byte(" \n a \t\r\n b c\n"))))
 	assert.Equal(t, "", string(squash(nil, []byte(" \n "))))

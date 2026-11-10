@@ -6,7 +6,36 @@
 
 **grep for XML.** Query XML files that are too big for other tools: saxer streams the input, uses a few megabytes of memory whatever the file size, and gets through 650–900 MB a second.
 
-## Install
+## Installation
+
+### Download a release binary
+
+Every tagged version has ready-built binaries on the [Releases page](https://github.com/tcw/saxer/releases), no Go needed. Pick the archive for your system:
+
+| OS | Intel / AMD (amd64) | ARM (arm64) |
+| --- | --- | --- |
+| Linux | `saxer_<version>_linux_amd64.tar.gz` | `saxer_<version>_linux_arm64.tar.gz` |
+| macOS | `saxer_<version>_darwin_amd64.tar.gz` | `saxer_<version>_darwin_arm64.tar.gz` (Apple silicon) |
+| Windows | `saxer_<version>_windows_amd64.zip` | `saxer_<version>_windows_arm64.zip` |
+
+Extract it and put the `saxer` binary somewhere on your `PATH`, for example on Linux or macOS:
+
+    tar -xzf saxer_<version>_linux_amd64.tar.gz
+    sudo mv saxer /usr/local/bin/
+    saxer --version
+
+On Windows, unzip the archive and move `saxer.exe` to a folder listed in your `Path` environment variable.
+
+To verify the download, fetch `checksums.txt` from the same release and check the archive against it:
+
+    sha256sum --ignore-missing -c checksums.txt              # Linux
+    shasum -a 256 --ignore-missing -c checksums.txt          # macOS
+
+The binaries are not signed. On macOS, if Gatekeeper refuses to run saxer, remove the quarantine flag:
+
+    xattr -d com.apple.quarantine saxer
+
+### Install from source
 
     go install github.com/tcw/saxer@latest
 
@@ -266,3 +295,11 @@ Issues and pull requests are welcome. Before sending a change, run:
     go test ./saxreader -run '^$' -fuzz FuzzRead -fuzztime 30s
 
 Compare benchmark runs with [benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat), and include before and after numbers in pull requests that aim to make saxer faster. A CPU profile of a real run is one flag away: `saxer --profile-cpu -n car cars.xml && go tool pprof -top saxer cpu.pprof`.
+
+### Releasing
+
+Pushing a tag that starts with `v` (for example `v1.2.0`, or `v1.2.0-rc.1` for a prerelease) runs the [release workflow](.github/workflows/release.yml): it runs the tests, then [GoReleaser](https://goreleaser.com) builds binaries for linux, darwin and windows on amd64 and arm64, and publishes them with `checksums.txt` and a changelog on a GitHub Release. Commits starting with `docs:`, `test:` or `chore:` are left out of the changelog. Running the workflow by hand builds a snapshot without publishing anything; locally the same is:
+
+    goreleaser check
+    goreleaser release --snapshot --clean   # archives land in dist/
+

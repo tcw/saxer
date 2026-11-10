@@ -31,3 +31,6 @@ saxer.iml
 # Build output and profiles
 /saxer
 cpu.pprof
+
+# GoReleaser output
+/dist/

@@ -19,9 +19,14 @@ import (
 	"github.com/tcw/saxer/tagmatcher"
 )
 
-// version is normally taken from the Go build information. It can be set
-// at build time with -ldflags "-X main.version=v1.2.3".
-var version = ""
+// Build information, set by release builds with
+// -ldflags "-X main.version=v1.2.3 -X main.commit=... -X main.date=...".
+// When version is empty it is taken from the Go build information.
+var (
+	version = ""
+	commit  = ""
+	date    = ""
+)
 
 // Exit codes, as for grep.
 const (
@@ -93,6 +98,7 @@ func newRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	cmd.SetVersionTemplate(versionInfo() + "\n")
 
 	f := cmd.Flags()
 	f.SortFlags = false
@@ -115,6 +121,19 @@ func newRootCmd() *cobra.Command {
 	f.IntVar(&opts.contentBuf, "cont-buf", 4, "Size of content buffer in MB - largest returned element")
 	f.BoolVar(&opts.cpuProfile, "profile-cpu", false, "Write a CPU profile to cpu.pprof")
 	return cmd
+}
+
+// versionInfo returns the version line printed by --version, with the
+// commit and build date when they are known.
+func versionInfo() string {
+	s := "saxer " + buildVersion()
+	if commit != "" {
+		s += "\ncommit: " + commit
+	}
+	if date != "" {
+		s += "\nbuilt: " + date
+	}
+	return s
 }
 
 // buildVersion returns the version of the module from the build
