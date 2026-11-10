@@ -1,215 +1,188 @@
+// Package tagmatcher decides which steps of a query an element satisfies.
 package tagmatcher
 
 import (
-	"fmt"
+	"bytes"
+	"math/bits"
 	"strings"
+	"unicode/utf8"
 
+	"github.com/tcw/saxer/markup"
 	"github.com/tcw/saxer/queryparser"
-	"github.com/tcw/saxer/tagpath"
 )
 
-// Options control how query tag names and attributes are compared with
+// Options control how query names, attributes and text are compared with
 // the document. The zero value matches exactly and case sensitively.
 type Options struct {
-	Contains        bool // a query name or value matches when it is a substring
+	Contains        bool // a query name, value or text matches when it is a substring
 	CaseInsensitive bool
 	OmitNamespace   bool // ignore "ns:" prefixes on tag names
 }
 
-type TagMatcher struct {
-	query         tagpath.TagPath
-	queryIsEmpty  bool
-	path          tagpath.TagPath
-	lastMatchPath []string
-	lastMatchPos  int
-	tmpAttr       []int
-	tmpAttrPos    int
-	opts          Options
-	equal         func(query, source string) bool
+type attr struct {
+	key, value []byte
+	hasValue   bool
 }
 
-func equals(query, source string) bool {
-	return query == source
+type step struct {
+	name    []byte // nil matches any element
+	attrs   []attr
+	text    []byte
+	hasText bool
 }
 
-func contains(query, source string) bool {
-	return strings.Contains(source, query)
+// Matcher matches elements against the steps of a query. It keeps scratch
+// buffers, so it is not safe for concurrent use.
+type Matcher struct {
+	steps []step
+	opts  Options
+
+	attrs   []markup.Attr // attributes of the tag being matched
+	lower   []byte        // scratch for case folding
+	unesc   []byte        // scratch for unescaped attribute values
+	textBuf []byte        // scratch for element text
 }
 
-func NewTagMatcher(queryString string, opts Options) (TagMatcher, error) {
-	q, err := queryparser.Parse(queryString)
+// New parses query and returns a Matcher for it.
+func New(query string, opts Options) (*Matcher, error) {
+	steps, err := queryparser.Parse(query)
 	if err != nil {
-		return TagMatcher{}, err
+		return nil, err
 	}
-	tm := TagMatcher{
-		query:         *q,
-		queryIsEmpty:  true,
-		path:          *tagpath.NewTagPath(),
-		lastMatchPath: make([]string, tagpath.MaxDepth),
-		tmpAttr:       make([]int, 4*tagpath.MaxAttributes),
-		opts:          opts,
-		equal:         equals,
-	}
-	if opts.Contains {
-		tm.equal = contains
-	}
+	m := &Matcher{opts: opts}
 	// Normalise the query once so matching only has to normalise the document.
-	for i := 0; i < q.PathPos; i++ {
-		tag := &tm.query.Path[i]
-		tag.Name = tm.normaliseName(tag.Name)
-		for j := 0; j < tag.AttributePos; j++ {
-			tag.Attributes[j].Key = tm.normaliseCase(tag.Attributes[j].Key)
-			tag.Attributes[j].Value = tm.normaliseCase(tag.Attributes[j].Value)
+	for _, s := range steps {
+		st := step{hasText: s.HasText}
+		if s.Name != "" {
+			st.name = []byte(m.normaliseCase(m.omitNamespace(s.Name)))
 		}
-		if tag.Name != "" || tag.AttributePos > 0 {
-			tm.queryIsEmpty = false
+		if s.HasText {
+			st.text = []byte(m.normaliseCase(s.Text))
 		}
+		for _, a := range s.Attrs {
+			st.attrs = append(st.attrs, attr{
+				key:      []byte(m.normaliseCase(a.Key)),
+				value:    []byte(m.normaliseCase(a.Value)),
+				hasValue: a.HasValue,
+			})
+		}
+		m.steps = append(m.steps, st)
 	}
-	return tm, nil
+	return m, nil
 }
 
-func (tm *TagMatcher) normaliseCase(s string) string {
-	if tm.opts.CaseInsensitive {
+func (m *Matcher) normaliseCase(s string) string {
+	if m.opts.CaseInsensitive {
 		return strings.ToLower(s)
 	}
 	return s
 }
 
-func (tm *TagMatcher) normaliseName(name string) string {
-	if tm.opts.OmitNamespace {
+func (m *Matcher) omitNamespace(name string) string {
+	if m.opts.OmitNamespace {
 		if _, local, found := strings.Cut(name, ":"); found {
-			name = local
+			return local
 		}
 	}
-	return tm.normaliseCase(name)
+	return name
 }
 
-func (tm *TagMatcher) GetCurrentPath() string {
-	return tm.path.GetCurrentPath()
+// Steps returns the number of steps in the query.
+func (m *Matcher) Steps() int {
+	return len(m.steps)
 }
 
-func (tm *TagMatcher) AddTag(tagText string) error {
-	tagNameEnd := 0
-	insideAttrValue := false
-	insideAttrKey := false
-	readSpace := false
-	readEquals := false
-	tm.tmpAttrPos = 0
-	var separator rune = 0
-	cleanedTag := tagText
-	if strings.HasSuffix(tagText, "/") {
-		cleanedTag = strings.TrimRight(tagText, "/")
+// Last is the bit of the last step. An element whose Match result has it
+// set matches the whole query.
+func (m *Matcher) Last() uint64 {
+	return 1 << (len(m.steps) - 1)
+}
+
+// HasText reports whether the query matches on element text, which is
+// only known once the element has ended.
+func (m *Matcher) HasText() bool {
+	return m.steps[len(m.steps)-1].hasText
+}
+
+// Next returns the steps an element may satisfy given the result of
+// Match for its parent: the first step, and every step that follows one
+// the parent satisfied.
+func (m *Matcher) Next(parent uint64) uint64 {
+	next := parent<<1 | 1
+	if len(m.steps) < 64 {
+		next &= 1<<len(m.steps) - 1
 	}
-	trimmed := strings.TrimSpace(cleanedTag)
-	for key, value := range trimmed {
-		if tm.tmpAttrPos >= 4*tagpath.MaxAttributes {
-			return fmt.Errorf("more than %d attributes in tag <%s>", tagpath.MaxAttributes, tagText)
+	return next
+}
+
+// Match returns the subset of the steps in candidates that a start tag
+// satisfies, as a bit set. name is the tag name and rest the part of the
+// tag after it. Attributes are parsed only when a step's name matches.
+func (m *Matcher) Match(candidates uint64, name, rest []byte) (uint64, error) {
+	var matched uint64
+	parsed := false
+	for c := candidates; c != 0; c &= c - 1 {
+		i := bits.TrailingZeros64(c)
+		s := &m.steps[i]
+		if s.name != nil && !m.nameMatches(s.name, name) {
+			continue
 		}
-		if isSpace(value) && !insideAttrValue {
-			if tagNameEnd == 0 {
-				tagNameEnd = key
+		if !parsed {
+			var err error
+			if m.attrs, err = markup.ParseAttributes(rest, m.attrs[:0]); err != nil {
+				return 0, err
 			}
-			readSpace = true
-		} else if value == rune('=') && !insideAttrValue {
-			readEquals = true
-			tm.tmpAttr[tm.tmpAttrPos] = key
-			tm.tmpAttrPos++
-		} else if readEquals && !insideAttrValue && (value == rune('\'') || value == rune('"')) {
-			separator = value
-			insideAttrValue = true
-			insideAttrKey = false
-			readEquals = false
-			tm.tmpAttr[tm.tmpAttrPos] = key + 1
-			tm.tmpAttrPos++
-		} else if readSpace && !insideAttrValue {
-			if !insideAttrKey {
-				tm.tmpAttr[tm.tmpAttrPos] = key
-				tm.tmpAttrPos++
-			}
-			insideAttrKey = true
-		} else if value == separator && insideAttrValue {
-			separator = 0
-			insideAttrValue = false
-			tm.tmpAttr[tm.tmpAttrPos] = key
-			tm.tmpAttrPos++
+			parsed = true
+		}
+		if m.attributesMatch(s) {
+			matched |= 1 << i
 		}
 	}
-	if tm.path.PathPos >= tagpath.MaxDepth {
-		return fmt.Errorf("elements nested deeper than %d levels are not supported", tagpath.MaxDepth)
-	}
-	tag := tm.path.NextTag()
-	if tm.tmpAttrPos == 0 {
-		tag.Name = strings.TrimSpace(tagText)
-	} else {
-		tag.Name = tagText[:tagNameEnd]
-	}
-	if tm.tmpAttrPos%4 != 0 {
-		return fmt.Errorf("malformed attributes in tag <%s>", tagText)
-	}
-	for i := 0; i < tm.tmpAttrPos; i = i + 4 {
-		key := strings.TrimSpace(tagText[tm.tmpAttr[i]:tm.tmpAttr[i+1]])
-		value := tagText[tm.tmpAttr[i+2]:tm.tmpAttr[i+3]]
-		tag.AddAttribute(tm.normaliseCase(key), tm.normaliseCase(value))
-	}
-	return nil
+	return matched, nil
 }
 
-func isSpace(r rune) bool {
-	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
-}
-
-func (np *TagMatcher) RemoveLast() {
-	np.path.RemoveLast()
-}
-
-func (tm *TagMatcher) TagNameMatchesLastMatch() bool {
-	if tm.lastMatchPos == tm.path.PathPos {
-		for i := 0; i < tm.lastMatchPos; i++ {
-			if tm.lastMatchPath[i] != tm.path.Path[i].Name {
-				return false
-			}
-		}
-	} else {
-		return false
-	}
-	return true
-}
-
-// MatchesPath reports whether the innermost elements of the current path
-// match the query, and if so remembers the path as the last match.
-func (tm *TagMatcher) MatchesPath() bool {
-	queryLen := tm.query.PathPos
-	if tm.queryIsEmpty || tm.path.PathPos < queryLen {
-		return false
-	}
-	offset := tm.path.PathPos - queryLen
-	for i := queryLen - 1; i >= 0; i-- {
-		if !tm.tagMatches(&tm.query.Path[i], &tm.path.Path[i+offset]) {
-			return false
+func (m *Matcher) nameMatches(query, name []byte) bool {
+	if m.opts.OmitNamespace {
+		if i := bytes.IndexByte(name, ':'); i >= 0 {
+			name = name[i+1:]
 		}
 	}
-	tm.lastMatchPos = tm.path.PathPos
-	for i := 0; i < tm.path.PathPos; i++ {
-		tm.lastMatchPath[i] = tm.path.Path[i].Name
-	}
-	return true
+	return m.equal(query, name)
 }
 
-func (tm *TagMatcher) tagMatches(query, tag *tagpath.Tag) bool {
-	if query.Name != "" && !tm.equal(query.Name, tm.normaliseName(tag.Name)) {
-		return false
+// equal compares a normalised query value with a document value.
+func (m *Matcher) equal(query, value []byte) bool {
+	switch {
+	case !m.opts.CaseInsensitive && !m.opts.Contains:
+		return bytes.Equal(query, value)
+	case !m.opts.Contains:
+		return bytes.EqualFold(query, value)
+	case !m.opts.CaseInsensitive:
+		return bytes.Contains(value, query)
 	}
-	return tm.attributesMatch(query, tag)
+	m.lower = appendLower(m.lower[:0], value)
+	return bytes.Contains(m.lower, query)
 }
 
-// attributesMatch reports whether every query attribute is matched by an
-// attribute of tag. A query attribute without a value matches on key only.
-// Attribute keys and values of both are already case normalised.
-func (tm *TagMatcher) attributesMatch(query, tag *tagpath.Tag) bool {
-	for _, want := range query.Attributes[:query.AttributePos] {
+// attributesMatch reports whether every attribute of s is matched by an
+// attribute of the current tag. Values are compared after unescaping.
+func (m *Matcher) attributesMatch(s *step) bool {
+	for _, want := range s.attrs {
 		found := false
-		for _, have := range tag.Attributes[:tag.AttributePos] {
-			if tm.equal(want.Key, have.Key) && (want.Value == "" || tm.equal(want.Value, have.Value)) {
+		for _, have := range m.attrs {
+			if !m.equal(want.key, have.Key) {
+				continue
+			}
+			if !want.hasValue {
+				found = true
+				break
+			}
+			value := have.Value
+			if bytes.IndexByte(value, '&') >= 0 {
+				m.unesc = markup.AppendUnescaped(m.unesc[:0], value)
+				value = m.unesc
+			}
+			if m.equal(want.value, value) {
 				found = true
 				break
 			}
@@ -219,4 +192,29 @@ func (tm *TagMatcher) attributesMatch(query, tag *tagpath.Tag) bool {
 		}
 	}
 	return true
+}
+
+// TextMatches reports whether inner, the xml between the start and end
+// tag of an element, has the text the last step asks for.
+func (m *Matcher) TextMatches(inner []byte) bool {
+	s := &m.steps[len(m.steps)-1]
+	if !s.hasText {
+		return true
+	}
+	m.textBuf = markup.AppendText(m.textBuf[:0], inner)
+	return m.equal(s.text, m.textBuf)
+}
+
+// appendLower appends s in lower case to dst.
+func appendLower(dst, s []byte) []byte {
+	for i, c := range s {
+		if c >= utf8.RuneSelf {
+			return append(dst, bytes.ToLower(s[i:])...)
+		}
+		if 'A' <= c && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		dst = append(dst, c)
+	}
+	return dst
 }

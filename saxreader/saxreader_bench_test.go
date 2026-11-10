@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tcw/saxer/contentbuffer"
 	"github.com/tcw/saxer/tagmatcher"
 )
 
@@ -26,12 +25,12 @@ func BenchmarkRead(b *testing.B) {
 			b.SetBytes(int64(len(doc)))
 			for i := 0; i < b.N; i++ {
 				sr := New()
-				sr.EmitterFn = func(*contentbuffer.EmitterData) bool { return false }
-				tm, err := tagmatcher.NewTagMatcher(query, tagmatcher.Options{})
+				sr.EmitterFn = func(*Match) bool { return false }
+				tm, err := tagmatcher.New(query, tagmatcher.Options{})
 				if err != nil {
 					b.Fatal(err)
 				}
-				if err := sr.Read(bytes.NewReader(doc), &tm); err != nil {
+				if err := sr.Read(bytes.NewReader(doc), tm); err != nil {
 					b.Fatal(err)
 				}
 			}

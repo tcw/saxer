@@ -11,11 +11,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tcw/saxer/contentbuffer"
+	"github.com/tcw/saxer/queryparser"
 	"github.com/tcw/saxer/tagmatcher"
 )
 
-func newTestSaxReader(emitterTestFn func(*contentbuffer.EmitterData) bool) SaxReader {
+func newTestSaxReader(emitterTestFn func(*Match) bool) SaxReader {
 
 	return SaxReader{ElementBufferSize: 100,
 		ContentBufferSize: 1024,
@@ -27,58 +27,49 @@ func newTestSaxReader(emitterTestFn func(*contentbuffer.EmitterData) bool) SaxRe
 
 func TestParseXmlOneNode(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello>test</hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "hello")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<hello>test</hello>")
 }
 
-func TestParseXmlOneNodeEmptySearch(t *testing.T) {
-	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
-		return false
-	}
-	reader := bytes.NewReader([]byte("<hello>test</hello>"))
-	sax := newTestSaxReader(emitter)
-	tm := newTagMatcher(t, "")
-	err := sax.Read(reader, &tm)
-	assert.Nil(t, err)
-	assert.Equal(t, res, "")
+func TestEmptySearchIsAnError(t *testing.T) {
+	_, err := tagmatcher.New("", tagmatcher.Options{})
+	assert.ErrorIs(t, err, queryparser.ErrEmpty)
 }
 
 func TestParseInnerXmlOneNode(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello>test</hello>"))
 	sax := newTestSaxReader(emitter)
 	sax.IsInnerXml = true
 	tm := newTagMatcher(t, "hello")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "test")
 }
 
 func TestParseXmlNodeConstrainedBuffer(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello>test</hello>"))
 	sax := newTestSaxReader(emitter)
 	sax.ReaderBufferSize = 1
 	tm := newTagMatcher(t, "hello")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<hello>test</hello>")
 }
@@ -86,8 +77,8 @@ func TestParseXmlNodeConstrainedBuffer(t *testing.T) {
 func TestParseXmlNodesConstrainedBuffer(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		actuals[actualsPos] = ed.Content
+	emitter := func(ed *Match) bool {
+		actuals[actualsPos] = string(ed.Content)
 		actualsPos++
 		return false
 	}
@@ -95,7 +86,7 @@ func TestParseXmlNodesConstrainedBuffer(t *testing.T) {
 	sax := newTestSaxReader(emitter)
 	sax.ReaderBufferSize = 1
 	tm := newTagMatcher(t, "helloA/helloB/helloC")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, actuals[0], "<helloC>C1</helloC>")
 	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
@@ -104,8 +95,8 @@ func TestParseXmlNodesConstrainedBuffer(t *testing.T) {
 func TestParseXmlNodesWithComments(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		actuals[actualsPos] = ed.Content
+	emitter := func(ed *Match) bool {
+		actuals[actualsPos] = string(ed.Content)
 		actualsPos++
 		return false
 	}
@@ -113,7 +104,7 @@ func TestParseXmlNodesWithComments(t *testing.T) {
 	sax := newTestSaxReader(emitter)
 	sax.ReaderBufferSize = 1
 	tm := newTagMatcher(t, "helloA/helloB/helloC")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, actuals[0], "<helloC>C1</helloC>")
 	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
@@ -122,15 +113,15 @@ func TestParseXmlNodesWithComments(t *testing.T) {
 func TestParseXmlNodesWithCdata(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		actuals[actualsPos] = ed.Content
+	emitter := func(ed *Match) bool {
+		actuals[actualsPos] = string(ed.Content)
 		actualsPos++
 		return false
 	}
 	reader := bytes.NewReader([]byte("<helloA><helloB><helloC><![CDATA[Hello<! World!]]></helloC><helloC>C2</helloC></helloB></helloA>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "helloA/helloB/helloC")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, actuals[0], "<helloC><![CDATA[Hello<! World!]]></helloC>")
 	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
@@ -139,15 +130,15 @@ func TestParseXmlNodesWithCdata(t *testing.T) {
 func TestParseXmlNodesWithCdataAndComment(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		actuals[actualsPos] = ed.Content
+	emitter := func(ed *Match) bool {
+		actuals[actualsPos] = string(ed.Content)
 		actualsPos++
 		return false
 	}
 	reader := bytes.NewReader([]byte("<helloA><!-- test<>--<><--><helloB><helloC><![CDATA[Hello<! World!]]></helloC><helloC>C2</helloC></helloB></helloA>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "helloA/helloB/helloC")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, actuals[0], "<helloC><![CDATA[Hello<! World!]]></helloC>")
 	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
@@ -156,8 +147,8 @@ func TestParseXmlNodesWithCdataAndComment(t *testing.T) {
 func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 	var actuals []string = make([]string, 10)
 	var actualsPos int = 0
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		actuals[actualsPos] = ed.Content
+	emitter := func(ed *Match) bool {
+		actuals[actualsPos] = string(ed.Content)
 		actualsPos++
 		return false
 	}
@@ -165,7 +156,7 @@ func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 	sax := newTestSaxReader(emitter)
 	sax.ReaderBufferSize = 1
 	tm := newTagMatcher(t, "helloA/helloB/helloC")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, actuals[0], "<helloC><![CDATA[Hello<! World!]]></helloC>")
 	assert.Equal(t, actuals[1], "<helloC>C2</helloC>")
@@ -173,135 +164,135 @@ func TestParseXmlNodesWithCdataAndCommentConstrainedBuffer(t *testing.T) {
 
 func TestParseXmlNodesWithLtEscapeTag(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<helloA><helloB>&lt;helloC>&lt;/helloC></helloB></helloA>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "helloA/helloB")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<helloB>&lt;helloC>&lt;/helloC></helloB>")
 }
 
 func TestParseXmlOneNodeWithLtError(t *testing.T) {
 
-	emitter := func(ed *contentbuffer.EmitterData) bool {
+	emitter := func(ed *Match) bool {
 		return false
 	}
 	reader := bytes.NewReader([]byte("<he<llo>test</hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "hello")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.NotNil(t, err)
 }
 
 func TestParseXmlOneNodeWithEndElementBeforeStartError(t *testing.T) {
-	emitter := func(ed *contentbuffer.EmitterData) bool {
+	emitter := func(ed *Match) bool {
 		return false
 	}
 	reader := bytes.NewReader([]byte("</hello>test</hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "hello")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.NotNil(t, err)
 }
 
 func TestParseXmlOneNodeOneAttributeDoubleQuote(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello id=\"123\">test</hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "hello?id=123")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<hello id=\"123\">test</hello>")
 }
 
 func TestParseXmlOneNodeOneAttributeSingle(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello id='123'>test</hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "hello?id=123")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<hello id='123'>test</hello>")
 }
 
 func TestParseXmlOneNodeTwoAttributes(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\">test</hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "hello?id=123&ref=42")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<hello id=\"123\" ref=\"42\">test</hello>")
 }
 
 func TestParseXmlOneNodeTwoAttributesNoMatch(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\">test</hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "hello?id=123&ref=421")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.NotEqual(t, res, "<hello id=\"123\" ref=\"42\">test</hello>")
 }
 
 func TestParseXmlTest(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello id=\"123\" ref=\"42\"><hello2 idx=\"1234\" refx=\"421\">test</hello2></hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "hello?id=123&ref=42/hello2?idx=1234&refx=421")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<hello2 idx=\"1234\" refx=\"421\">test</hello2>")
 }
 
 func TestParseXmlTestS(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello><text xml:space=\"preserve\">this</text></hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "text?xml:space")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<text xml:space=\"preserve\">this</text>")
 }
 
 func TestParseXmlTestS2(t *testing.T) {
 	res := ""
-	emitter := func(ed *contentbuffer.EmitterData) bool {
-		res = ed.Content
+	emitter := func(ed *Match) bool {
+		res = string(ed.Content)
 		return false
 	}
 	reader := bytes.NewReader([]byte("<hello><text xml:space=\"preserve\">this</text><hello2>Test2</hello2><hello3>Test3</hello3></hello>"))
 	sax := newTestSaxReader(emitter)
 	tm := newTagMatcher(t, "?xml:space")
-	err := sax.Read(reader, &tm)
+	err := sax.Read(reader, tm)
 	assert.Nil(t, err)
 	assert.Equal(t, res, "<text xml:space=\"preserve\">this</text>")
 }
@@ -309,21 +300,21 @@ func TestParseXmlTestS2(t *testing.T) {
 // readAll runs sr over r with query and collects every emitted element.
 func readAll(sr SaxReader, r io.Reader, query string) ([]string, error) {
 	var got []string
-	sr.EmitterFn = func(ed *contentbuffer.EmitterData) bool {
-		got = append(got, ed.Content)
+	sr.EmitterFn = func(ed *Match) bool {
+		got = append(got, string(ed.Content))
 		return false
 	}
-	tm, err := tagmatcher.NewTagMatcher(query, tagmatcher.Options{})
+	tm, err := tagmatcher.New(query, tagmatcher.Options{})
 	if err != nil {
 		return nil, err
 	}
-	err = sr.Read(r, &tm)
+	err = sr.Read(r, tm)
 	return got, err
 }
 
-func newTagMatcher(t *testing.T, query string) tagmatcher.TagMatcher {
+func newTagMatcher(t *testing.T, query string) *tagmatcher.Matcher {
 	t.Helper()
-	tm, err := tagmatcher.NewTagMatcher(query, tagmatcher.Options{})
+	tm, err := tagmatcher.New(query, tagmatcher.Options{})
 	require.NoError(t, err)
 	return tm
 }
@@ -462,12 +453,12 @@ func TestReadMalformedInputReturnsError(t *testing.T) {
 func TestReadStopsWhenEmitterSaysSo(t *testing.T) {
 	var got []string
 	sr := New()
-	sr.EmitterFn = func(ed *contentbuffer.EmitterData) bool {
-		got = append(got, ed.Content)
+	sr.EmitterFn = func(ed *Match) bool {
+		got = append(got, string(ed.Content))
 		return len(got) == 2
 	}
 	tm := newTagMatcher(t, "b")
-	err := sr.Read(strings.NewReader(`<a><b>1</b><b>2</b><b>3</b></a>`), &tm)
+	err := sr.Read(strings.NewReader(`<a><b>1</b><b>2</b><b>3</b></a>`), tm)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"<b>1</b>", "<b>2</b>"}, got)
 }
@@ -479,6 +470,7 @@ func FuzzRead(f *testing.F) {
 		`<?xml version="1.0"?><!DOCTYPE a [<!ENTITY e "x">]><a><!-- c --><b><![CDATA[<]]></b></a>`,
 		`<a><b x="1>2"/></a>`,
 		`<a><b>`,
+		`<a><b><b>v</b>w</b><b> v </b></a>`,
 	} {
 		f.Add(seed, uint8(3))
 	}
@@ -486,12 +478,15 @@ func FuzzRead(f *testing.F) {
 		sr := New()
 		sr.ElementBufferSize = 64
 		sr.ContentBufferSize = 256
-		want, wantErr := readAll(sr, strings.NewReader(xml), "b")
-		sr.ReaderBufferSize = int(bufSize%16) + 1
-		got, gotErr := readAll(sr, iotest.HalfReader(strings.NewReader(xml)), "b")
-		if wantErr == nil {
-			assert.NoError(t, gotErr)
-			assert.Equal(t, want, got)
+		for _, query := range []string{"b", "b~v"} {
+			sr.ReaderBufferSize = 4096
+			want, wantErr := readAll(sr, strings.NewReader(xml), query)
+			sr.ReaderBufferSize = int(bufSize%16) + 1
+			got, gotErr := readAll(sr, iotest.HalfReader(strings.NewReader(xml)), query)
+			if wantErr == nil {
+				assert.NoError(t, gotErr)
+				assert.Equal(t, want, got)
+			}
 		}
 	})
 }
