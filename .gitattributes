@@ -1,0 +1,3 @@
+# Check out text files with LF endings on every OS, so tests that
+# compare output with testdata behave the same on Windows.
+* text=auto eol=lf
