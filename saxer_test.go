@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
-	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"testing/iotest"
@@ -110,9 +110,9 @@ func TestReadmeExampleUsage(t *testing.T) {
 		{"inner xml", []string{"-i", "Fuel"}, lines("Gasoline", "Diesel", "Diesel")},
 		{"count", []string{"-n", "Fuel"}, lines("3")},
 		{"meta", []string{"-m", "engine"}, lines(
-			"5-7    cars/car/engine",
-			"12-14    cars/car/engine",
-			"19-21    cars/car/engine")},
+			"5-7\tcars/car/engine",
+			"12-14\tcars/car/engine",
+			"19-21\tcars/car/engine")},
 		{"first n", []string{"-f", "2", "Fuel"}, lines(fuel1, fuel2)},
 		{"unescape", []string{"-u", "info"}, lines("<info><some-xml>data</some-xml></info>")},
 		{"case insensitive", []string{"-s", "fuel"}, lines(fuel1, fuel2, fuel3)},
@@ -165,7 +165,8 @@ func TestMissingFileIsReported(t *testing.T) {
 }
 
 // Keeps README.md honest: the example file it shows must be testdata/example.xml,
-// and every "Command: / Returns:" block must match what saxer actually prints.
+// and every "$ saxer ... testdata/example.xml" example must print what saxer
+// actually prints.
 func TestReadmeIsUpToDate(t *testing.T) {
 	readme, err := os.ReadFile("README.md")
 	require.NoError(t, err)
@@ -176,19 +177,83 @@ func TestReadmeIsUpToDate(t *testing.T) {
 		assert.Contains(t, string(readme), indent(string(example)))
 	})
 
-	blocks := regexp.MustCompile(`Command:\n\n    saxer ([^\n]*)\n\n    Returns:\n((?:    [^\n]*\n)+)`).
-		FindAllStringSubmatch(string(readme), -1)
-	require.Len(t, blocks, 14, "number of Command/Returns examples in README.md")
-
-	for _, b := range blocks {
-		t.Run(b[1], func(t *testing.T) {
-			args := strings.Fields(strings.ReplaceAll(b[1], `"`, ""))
-			args[len(args)-1] = exampleFile
-			got, err := runSaxer(t, nil, args...)
-			require.NoError(t, err)
-			assert.Equal(t, b[2], indent(got))
+	examples := readmeExamples(string(readme))
+	require.GreaterOrEqual(t, len(examples), 20, "number of examples in README.md")
+	for _, ex := range examples {
+		t.Run(strings.Join(ex.args, " "), func(t *testing.T) {
+			got, err := runSaxer(t, nil, ex.args...)
+			if !errors.Is(err, errNoMatch) {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, ex.output, got)
 		})
 	}
+}
+
+type readmeExample struct {
+	args   []string
+	output string
+}
+
+// readmeExamples returns the examples in an indented code block that run
+// saxer on the example file: a "$ saxer ..." line followed by its output.
+func readmeExamples(readme string) []readmeExample {
+	var examples []readmeExample
+	lines := strings.Split(readme, "\n")
+	for i := 0; i < len(lines); i++ {
+		cmd, ok := strings.CutPrefix(lines[i], "    $ saxer ")
+		if !ok {
+			continue
+		}
+		var out strings.Builder
+		for i+1 < len(lines) && strings.HasPrefix(lines[i+1], "    ") && !strings.HasPrefix(lines[i+1], "    $ ") {
+			i++
+			out.WriteString(strings.TrimPrefix(lines[i], "    ") + "\n")
+		}
+		args := shellSplit(cmd)
+		if len(args) == 0 || args[len(args)-1] != exampleFile || slices.Contains(args, "|") {
+			continue
+		}
+		examples = append(examples, readmeExample{args, out.String()})
+	}
+	return examples
+}
+
+// shellSplit splits a command line into words, as a shell would for
+// single and double quoted words.
+func shellSplit(s string) []string {
+	var words []string
+	var word strings.Builder
+	inWord := false
+	var quote rune
+	for _, c := range s {
+		switch {
+		case quote != 0 && c == quote:
+			quote = 0
+		case quote != 0:
+			word.WriteRune(c)
+		case c == '"' || c == '\'':
+			quote, inWord = c, true
+		case c == ' ':
+			if inWord {
+				words = append(words, word.String())
+				word.Reset()
+				inWord = false
+			}
+		default:
+			word.WriteRune(c)
+			inWord = true
+		}
+	}
+	if inWord {
+		words = append(words, word.String())
+	}
+	return words
+}
+
+func TestShellSplit(t *testing.T) {
+	assert.Equal(t, []string{"-n", "car?vin=1&man=Volvo", "a b", `x\&y`, "f"},
+		shellSplit(`-n "car?vin=1&man=Volvo" 'a b' "x\&y" f`))
 }
 
 // indent prefixes every line with four spaces, as in a markdown code block.
